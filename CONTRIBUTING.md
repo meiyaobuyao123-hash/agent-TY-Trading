@@ -21,9 +21,12 @@ Thank you for your interest in contributing to TY! This guide will help you get 
 
 | Tool | Version | Purpose |
 |---|---|---|
-| Python | 3.11+ | Core runtime |
+| Python | 3.11+ | Core engine runtime |
+| Node.js | 20+ | Optional: TypeScript plugin runtime |
 | Git | 2.30+ | Version control |
 | Docker | 24+ | Optional: containerized development |
+
+> **Note:** TY is a polyglot project. The core engine is Python, but plugins can be written in either Python or TypeScript -- both are first-class citizens. See [open-architecture.md](docs/open-architecture.md) for details on the plugin system.
 
 ### Step-by-Step Setup
 

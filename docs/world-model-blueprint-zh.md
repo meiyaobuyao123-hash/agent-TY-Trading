@@ -1474,3 +1474,9 @@ class HardLimits:
 - `/Users/wenruiwei/Desktop/agent TY Trading/ty_trading/layer2_causal/models/bayesian_network.py` - Bayesian belief network 是系统的智识核心。"哲学怪物"的灵魂就在这里。它必须支持正确的 Bayes 更新、校准跟踪和假设管理。
 - `/Users/wenruiwei/Desktop/agent TY Trading/ty_trading/layer4_evolver/genome/strategy_genome.py` - 策略基因组数据结构决定了策略如何被表示、变异和组合。这是整个进化系统的 DNA。
 - `/Users/wenruiwei/Desktop/agent TY Trading/ty_trading/markets/crypto.py` - 第一个具体的市场实现（Binance）。这是 MVP 的入口点：如果这个端到端的模拟交易能正常运作，概念就得到了验证。
+
+---
+
+### 相关文档
+
+关于**插件系统实现**的详细信息——包括四个层级的插件接口、插件清单 schema、SDK 使用方式（Python 和 TypeScript）以及插件贡献工作流——请参阅 [开放插件架构](open-architecture.md)。

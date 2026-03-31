@@ -10,7 +10,7 @@
 
 **An open-source, self-evolving AI system that perceives, reasons about, and trades across ALL financial markets from mathematical first principles.**
 
-[Architecture Blueprint](docs/world-model-blueprint.md) | [Free Data Sources](docs/free-data-sources-research.md) | [Contributing](CONTRIBUTING.md) | [中文文档](README_zh.md)
+[Architecture Blueprint](docs/world-model-blueprint.md) | [Plugin Architecture](docs/open-architecture.md) | [Free Data Sources](docs/free-data-sources-research.md) | [Contributing](CONTRIBUTING.md) | [中文文档](README_zh.md)
 
 </div>
 
@@ -36,19 +36,19 @@ The name "天演" (Tianyan) means "Natural Evolution" -- the system evolves its 
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Layer 4: EXECUTION ENGINE                              │
-│  Portfolio optimization · Risk management · Order       │
-│  routing · Position sizing · Multi-venue execution      │
+│  Layer 4: SELF-EVOLVER                                  │
+│  Strategy genome · Natural selection · Meta-cognition   │
+│  Calibration tracking · Fitness evaluation              │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 3: REASONING & DECISION                          │
-│  Causal inference · Bayesian updating · Game-theoretic  │
+│  Layer 3: COGNITIVE BIAS HUNTER                         │
+│  Herding detection · Anchoring bias · Recency bias ·    │
+│  Overconfidence · Rational price divergence analysis    │
+├─────────────────────────────────────────────────────────┤
+│  Layer 2: CAUSAL REASONING ENGINE                       │
+│  Causal DAGs · Bayesian updating · Game-theoretic       │
 │  modeling · Regime detection · Reflexivity analysis     │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 2: WORLD MODEL                                   │
-│  Causal graph · Entity relationships · Macro state ·    │
-│  Cross-market dependencies · Belief distributions       │
-├─────────────────────────────────────────────────────────┤
-│  Layer 1: PERCEPTION                                    │
+│  Layer 1: WORLD PERCEIVER                               │
 │  On-chain data · Order flow · Social sentiment ·        │
 │  Economic indicators · News · Prediction markets        │
 └─────────────────────────────────────────────────────────┘
@@ -56,10 +56,10 @@ The name "天演" (Tianyan) means "Natural Evolution" -- the system evolves its 
 
 | Layer | Purpose | Key Technologies |
 |---|---|---|
-| **Perception** | Ingest and normalize data from all markets | DeFiLlama, Binance WS, FRED, AKShare, Polymarket, Dune |
-| **World Model** | Maintain causal understanding of market structure | Bayesian networks, causal DAGs, knowledge graphs |
-| **Reasoning** | Generate hypotheses, evaluate edge, make decisions | Probabilistic programming, game theory solvers |
-| **Execution** | Convert decisions into profitable trades | Smart order routing, risk limits, portfolio optimization |
+| **World Perceiver** | Ingest and normalize data from all markets | DeFiLlama, Binance WS, FRED, AKShare, Polymarket, Dune |
+| **Causal Reasoning Engine** | Maintain causal understanding and generate hypotheses | Bayesian networks, causal DAGs, probabilistic programming |
+| **Cognitive Bias Hunter** | Detect cognitive biases in market pricing | Bias detectors, rational price models, divergence analysis |
+| **Self-Evolver** | Evolve strategies and self-improve over time | Genetic algorithms, meta-cognition, calibration tracking |
 
 ---
 
@@ -67,7 +67,8 @@ The name "天演" (Tianyan) means "Natural Evolution" -- the system evolves its 
 
 ### Prerequisites
 
-- Python 3.11+
+- Python 3.11+ (core engine)
+- Node.js 20+ (optional, for TypeScript plugins)
 - Git
 
 ### Installation
@@ -123,6 +124,7 @@ All configuration lives in `config/`. Key files:
 | [Architecture Blueprint (中文)](docs/world-model-blueprint-zh.md) | 完整系统设计与数学基础 |
 | [Free Data Sources Research](docs/free-data-sources-research.md) | Deep research on 30+ free data APIs |
 | [Free Data Sources (中文)](docs/free-data-sources-research-zh.md) | 30+ 免费数据 API 深度调研 |
+| [Open Plugin Architecture](docs/open-architecture.md) | Plugin system design (Python + TypeScript) |
 | [Contributing Guide](CONTRIBUTING.md) | How to contribute to TY |
 | [Contributing Guide (中文)](CONTRIBUTING_zh.md) | 如何贡献 TY 项目 |
 
@@ -152,10 +154,10 @@ Areas where we especially need help:
 
 - [x] Architecture blueprint
 - [x] Free data source research
-- [ ] Perception layer (data ingestion framework)
-- [ ] World model core (causal graph engine)
-- [ ] Reasoning engine (Bayesian decision system)
-- [ ] Execution engine (paper trading)
+- [ ] World Perceiver (data ingestion framework)
+- [ ] Causal Reasoning Engine core (causal graph engine)
+- [ ] Cognitive Bias Hunter (bias detection system)
+- [ ] Self-Evolver (strategy evolution & paper trading)
 - [ ] Plugin system (community extensions)
 - [ ] Live trading (with safety guards)
 

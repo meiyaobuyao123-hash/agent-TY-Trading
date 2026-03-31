@@ -1474,3 +1474,9 @@ Since this is a greenfield repository, the critical files are the ones that must
 - `/Users/wenruiwei/Desktop/agent TY Trading/ty_trading/layer2_causal/models/bayesian_network.py` - The Bayesian belief network is the intellectual core of the system. This is where "philosophical monster" lives. It must support proper Bayes updates, calibration tracking, and hypothesis management.
 - `/Users/wenruiwei/Desktop/agent TY Trading/ty_trading/layer4_evolver/genome/strategy_genome.py` - The strategy genome data structure determines how strategies can be represented, mutated, and combined. This is the DNA of the entire evolutionary system.
 - `/Users/wenruiwei/Desktop/agent TY Trading/ty_trading/markets/crypto.py` - The first concrete market implementation (Binance). This is the MVP entry point: if this works end-to-end with paper trading, the concept is proven.
+
+---
+
+### Related Documentation
+
+For details on the **plugin system implementation** -- including plugin interfaces for all four layers, the plugin manifest schema, SDK usage (Python & TypeScript), and the contribution workflow for plugins -- see [Open Plugin Architecture](open-architecture.md).

@@ -21,9 +21,12 @@
 
 | 工具 | 版本 | 用途 |
 |---|---|---|
-| Python | 3.11+ | 核心运行时 |
+| Python | 3.11+ | 核心引擎运行时 |
+| Node.js | 20+ | 可选：TypeScript 插件运行时 |
 | Git | 2.30+ | 版本管理 |
 | Docker | 24+ | 可选：容器化开发 |
+
+> **注意：** TY 是一个多语言项目。核心引擎使用 Python，但插件可以用 Python 或 TypeScript 编写——两者都是一等公民。详见 [open-architecture.md](docs/open-architecture.md) 了解插件系统。
 
 ### 逐步搭建
 

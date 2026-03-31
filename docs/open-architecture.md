@@ -7,7 +7,7 @@
 **Version**: 1.0.0
 **Status**: Draft
 **Last Updated**: 2026-03-31
-**License**: Apache 2.0
+**License**: MIT
 
 ---
 
@@ -105,7 +105,7 @@ Every plugin ships with a `plugin.manifest.json`:
     "paperTradeDays": 0
   },
   "tags": ["free", "equities", "no-auth"],
-  "license": "Apache-2.0"
+  "license": "MIT"
 }
 ```
 
@@ -1829,7 +1829,7 @@ agent-TY-Trading/
 ├── README_zh.md                     # Project overview (中文)
 ├── CONTRIBUTING.md                  # Contributor guide (English)
 ├── CONTRIBUTING_zh.md               # Contributor guide (中文)
-├── LICENSE                          # Apache 2.0
+├── LICENSE                          # MIT
 ├── CODE_OF_CONDUCT.md               # Contributor Covenant
 │
 ├── docs/
@@ -2356,7 +2356,7 @@ Not sure where to start? Here are high-impact contributions the community needs 
 | ADR-002 | gRPC bridge between Python and TypeScript plugins | Efficient binary serialization, bidirectional streaming, auto-generated types from protobuf. |
 | ADR-003 | Plugin sandbox with resource limits | A single misbehaving plugin must never crash the system. Defense in depth. |
 | ADR-004 | Mandatory backtest for strategy plugins | Prevents untested strategies from entering the Arena. Ensures minimum quality bar. |
-| ADR-005 | Apache 2.0 license | Permissive enough to attract enterprise contributors, requires attribution, patent grant included. |
+| ADR-005 | MIT license | Maximally permissive, simple, widely adopted in open-source — lowers barrier for contributors and enterprise adoption. |
 
 ---
 
