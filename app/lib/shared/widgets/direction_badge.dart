@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../core/theme/app_theme.dart';
 
-/// Badge showing market direction: up (green), down (red), flat (gray).
+/// Minimal direction indicator: small colored dot + Chinese text.
 class DirectionBadge extends StatelessWidget {
   final String direction;
   final double size;
@@ -18,45 +18,40 @@ class DirectionBadge extends StatelessWidget {
     final isDown = direction.toLowerCase() == 'down';
 
     final Color color;
-    final IconData icon;
     final String label;
 
     if (isUp) {
       color = AppTheme.upGreen;
-      icon = Icons.arrow_upward;
-      label = 'UP';
+      label = '看涨';
     } else if (isDown) {
       color = AppTheme.downRed;
-      icon = Icons.arrow_downward;
-      label = 'DOWN';
+      label = '看跌';
     } else {
       color = AppTheme.flatGray;
-      icon = Icons.remove;
-      label = 'FLAT';
+      label = '观望';
     }
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-      decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.15),
-        borderRadius: BorderRadius.circular(8),
-        border: Border.all(color: color.withValues(alpha: 0.4)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Icon(icon, color: color, size: size * 0.5),
-          const SizedBox(width: 4),
-          Text(
-            label,
-            style: TextStyle(
-              color: color,
-              fontWeight: FontWeight.bold,
-              fontSize: size * 0.4,
-            ),
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 6,
+          height: 6,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: TextStyle(
+            color: color,
+            fontWeight: FontWeight.w500,
+            fontSize: size * 0.4,
+          ),
+        ),
+      ],
     );
   }
 }

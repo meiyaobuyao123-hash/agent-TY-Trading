@@ -10,7 +10,7 @@ import '../../../../shared/widgets/error_widget.dart';
 import '../../../../shared/widgets/loading_widget.dart';
 import '../../providers/market_detail_provider.dart';
 
-/// Detail page for a single market showing price, judgments, and reasoning.
+/// Detail page for a single market — iOS large title style.
 class MarketDetailPage extends ConsumerWidget {
   final String symbol;
 
@@ -22,11 +22,24 @@ class MarketDetailPage extends ConsumerWidget {
     final judgmentsAsync = ref.watch(marketJudgmentsProvider(symbol));
 
     return Scaffold(
-      appBar: AppBar(title: Text(symbol)),
+      appBar: AppBar(
+        title: Text(
+          symbol,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(height: 0.5, color: AppTheme.divider),
+        ),
+      ),
       body: marketAsync.when(
-        loading: () => const LoadingWidget(message: 'Loading market...'),
+        loading: () => const LoadingWidget(message: '加载中...'),
         error: (err, _) => AppErrorWidget(
-          message: 'Failed to load market:\n$err',
+          message: '加载失败:\n$err',
           onRetry: () {
             ref.invalidate(marketDetailProvider(symbol));
             ref.invalidate(marketJudgmentsProvider(symbol));
@@ -40,7 +53,7 @@ class MarketDetailPage extends ConsumerWidget {
               : AppTheme.flatGray;
 
           return RefreshIndicator(
-            color: AppTheme.accent,
+            color: AppTheme.primary,
             onRefresh: () async {
               ref.invalidate(marketDetailProvider(symbol));
               ref.invalidate(marketJudgmentsProvider(symbol));
@@ -49,75 +62,70 @@ class MarketDetailPage extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Market header card
-                Card(
-                  child: Padding(
-                    padding: const EdgeInsets.all(20),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
+                // Price header
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      market.name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         Text(
-                          market.name,
+                          snap?.price != null
+                              ? _formatPrice(snap!.price!)
+                              : '--',
                           style: const TextStyle(
-                            fontSize: 14,
-                            color: AppTheme.textSecondary,
+                            fontSize: 36,
+                            fontWeight: FontWeight.bold,
+                            color: AppTheme.textPrimary,
                           ),
                         ),
-                        const SizedBox(height: 4),
-                        Row(
-                          crossAxisAlignment: CrossAxisAlignment.end,
-                          children: [
-                            Text(
-                              snap?.price != null
-                                  ? _formatPrice(snap!.price!)
-                                  : '--',
-                              style: const TextStyle(
-                                fontSize: 32,
-                                fontWeight: FontWeight.bold,
-                                color: AppTheme.textPrimary,
+                        const SizedBox(width: 12),
+                        if (changePct != null)
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(
+                              color: changeColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.w600,
+                                color: changeColor,
                               ),
                             ),
-                            const SizedBox(width: 12),
-                            if (changePct != null)
-                              Text(
-                                '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.w600,
-                                  color: changeColor,
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            _infoChip(market.marketType),
-                            const SizedBox(width: 8),
-                            _infoChip(market.source),
-                            if (market.isActive) ...[
-                              const SizedBox(width: 8),
-                              _infoChip('Active',
-                                  color: AppTheme.upGreen),
-                            ],
-                          ],
-                        ),
+                          ),
                       ],
                     ),
-                  ),
+                    const SizedBox(height: 12),
+                    Row(
+                      children: [
+                        _infoChip(market.marketType),
+                        const SizedBox(width: 8),
+                        _infoChip(market.source),
+                        if (market.isActive) ...[
+                          const SizedBox(width: 8),
+                          _infoChip('活跃', color: AppTheme.upGreen),
+                        ],
+                      ],
+                    ),
+                  ],
                 ),
 
-                const SizedBox(height: 24),
+                const SizedBox(height: 32),
 
-                // Judgment history
-                const Text(
-                  'Judgment History',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
+                // Section: AI判断历史
+                _sectionHeader('AI判断历史'),
                 const SizedBox(height: 12),
 
                 judgmentsAsync.when(
@@ -126,7 +134,7 @@ class MarketDetailPage extends ConsumerWidget {
                     child: LoadingWidget(),
                   ),
                   error: (err, _) => AppErrorWidget(
-                    message: 'Failed to load judgments',
+                    message: '加载判断失败',
                     onRetry: () =>
                         ref.invalidate(marketJudgmentsProvider(symbol)),
                   ),
@@ -135,7 +143,7 @@ class MarketDetailPage extends ConsumerWidget {
                       return const Padding(
                         padding: EdgeInsets.all(32),
                         child: Text(
-                          'No judgments yet for this market.',
+                          '暂无判断记录',
                           textAlign: TextAlign.center,
                           style: TextStyle(color: AppTheme.textSecondary),
                         ),
@@ -143,37 +151,29 @@ class MarketDetailPage extends ConsumerWidget {
                     }
 
                     return Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        // Latest reasoning (expanded)
+                        // Section: 最新分析
                         if (judgments.first.reasoning != null) ...[
-                          Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  const Text(
-                                    'Latest AI Reasoning',
-                                    style: TextStyle(
-                                      fontWeight: FontWeight.bold,
-                                      color: AppTheme.accent,
-                                      fontSize: 14,
-                                    ),
-                                  ),
-                                  const SizedBox(height: 8),
-                                  Text(
-                                    judgments.first.reasoning!,
-                                    style: const TextStyle(
-                                      color: AppTheme.textPrimary,
-                                      fontSize: 13,
-                                      height: 1.5,
-                                    ),
-                                  ),
-                                ],
+                          _sectionHeader('最新分析'),
+                          const SizedBox(height: 8),
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.all(16),
+                            decoration: BoxDecoration(
+                              color: AppTheme.surface,
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: Text(
+                              judgments.first.reasoning!,
+                              style: const TextStyle(
+                                color: AppTheme.textPrimary,
+                                fontSize: 14,
+                                height: 1.6,
                               ),
                             ),
                           ),
-                          const SizedBox(height: 16),
+                          const SizedBox(height: 24),
                         ],
 
                         // History list
@@ -192,17 +192,28 @@ class MarketDetailPage extends ConsumerWidget {
     );
   }
 
-  Widget _infoChip(String label, {Color color = AppTheme.accent}) {
+  Widget _sectionHeader(String title) {
+    return Text(
+      title,
+      style: const TextStyle(
+        fontSize: 18,
+        fontWeight: FontWeight.bold,
+        color: AppTheme.textPrimary,
+      ),
+    );
+  }
+
+  Widget _infoChip(String label, {Color color = AppTheme.primary}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.1),
+        color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(6),
-        border: Border.all(color: color.withValues(alpha: 0.3)),
       ),
       child: Text(
         label,
-        style: TextStyle(color: color, fontSize: 11, fontWeight: FontWeight.w500),
+        style: TextStyle(
+            color: color, fontSize: 12, fontWeight: FontWeight.w500),
       ),
     );
   }
@@ -223,42 +234,57 @@ class _JudgmentHistoryItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final timeFormat = DateFormat('yyyy-MM-dd HH:mm');
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(12),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      decoration: const BoxDecoration(
+        border: Border(
+          bottom: BorderSide(color: AppTheme.divider, width: 0.5),
+        ),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 DirectionBadge(direction: judgment.direction, size: 28),
-                _settlementIcon(),
+                const SizedBox(height: 6),
+                SizedBox(
+                  width: 180,
+                  child: ConfidenceBar(confidence: judgment.confidenceScore),
+                ),
               ],
             ),
-            const SizedBox(height: 8),
-            ConfidenceBar(confidence: judgment.confidenceScore),
-            const SizedBox(height: 8),
-            Text(
-              timeFormat.format(judgment.createdAt),
-              style: const TextStyle(
-                color: AppTheme.flatGray,
-                fontSize: 11,
+          ),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.end,
+            children: [
+              _settlementLabel(),
+              const SizedBox(height: 4),
+              Text(
+                timeFormat.format(judgment.createdAt),
+                style: const TextStyle(
+                  color: AppTheme.flatGray,
+                  fontSize: 11,
+                ),
               ),
-            ),
-          ],
-        ),
+            ],
+          ),
+        ],
       ),
     );
   }
 
-  Widget _settlementIcon() {
+  Widget _settlementLabel() {
     if (!judgment.isSettled) {
-      return const Icon(Icons.schedule, color: AppTheme.flatGray, size: 18);
+      return const Text('待验证',
+          style: TextStyle(color: AppTheme.flatGray, fontSize: 12));
     }
     if (judgment.isCorrect == true) {
-      return const Icon(Icons.check_circle, color: AppTheme.upGreen, size: 18);
+      return const Text('正确',
+          style: TextStyle(color: AppTheme.upGreen, fontSize: 12, fontWeight: FontWeight.w500));
     }
-    return const Icon(Icons.cancel, color: AppTheme.downRed, size: 18);
+    return const Text('错误',
+        style: TextStyle(color: AppTheme.downRed, fontSize: 12, fontWeight: FontWeight.w500));
   }
 }

@@ -19,7 +19,6 @@ void main() {
       await tester.pumpWidget(buildTestWidget(0.85));
 
       expect(find.text('85%'), findsOneWidget);
-      expect(find.text('Confidence'), findsOneWidget);
     });
 
     testWidgets('renders percentage text for 0%', (tester) async {

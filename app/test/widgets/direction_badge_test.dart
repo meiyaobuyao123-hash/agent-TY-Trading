@@ -12,32 +12,28 @@ void main() {
   }
 
   group('DirectionBadge', () {
-    testWidgets('renders UP with green arrow', (tester) async {
+    testWidgets('renders 看涨 for up direction', (tester) async {
       await tester.pumpWidget(buildTestWidget('up'));
 
-      expect(find.text('UP'), findsOneWidget);
-      expect(find.byIcon(Icons.arrow_upward), findsOneWidget);
+      expect(find.text('看涨'), findsOneWidget);
     });
 
-    testWidgets('renders DOWN with red arrow', (tester) async {
+    testWidgets('renders 看跌 for down direction', (tester) async {
       await tester.pumpWidget(buildTestWidget('down'));
 
-      expect(find.text('DOWN'), findsOneWidget);
-      expect(find.byIcon(Icons.arrow_downward), findsOneWidget);
+      expect(find.text('看跌'), findsOneWidget);
     });
 
-    testWidgets('renders FLAT with dash', (tester) async {
+    testWidgets('renders 观望 for flat direction', (tester) async {
       await tester.pumpWidget(buildTestWidget('flat'));
 
-      expect(find.text('FLAT'), findsOneWidget);
-      expect(find.byIcon(Icons.remove), findsOneWidget);
+      expect(find.text('观望'), findsOneWidget);
     });
 
-    testWidgets('unknown direction renders as FLAT', (tester) async {
+    testWidgets('unknown direction renders as 观望', (tester) async {
       await tester.pumpWidget(buildTestWidget('unknown'));
 
-      expect(find.text('FLAT'), findsOneWidget);
-      expect(find.byIcon(Icons.remove), findsOneWidget);
+      expect(find.text('观望'), findsOneWidget);
     });
   });
 }

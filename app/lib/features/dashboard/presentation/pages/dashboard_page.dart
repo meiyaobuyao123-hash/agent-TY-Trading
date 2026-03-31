@@ -20,15 +20,15 @@ class DashboardPage extends ConsumerWidget {
         title: const Column(
           children: [
             Text(
-              'TY 天演',
+              '天演',
               style: TextStyle(
-                fontSize: 20,
+                fontSize: 22,
                 fontWeight: FontWeight.bold,
-                color: AppTheme.accent,
+                color: AppTheme.textPrimary,
               ),
             ),
             Text(
-              'AI Financial World Model',
+              'AI金融世界模型',
               style: TextStyle(
                 fontSize: 12,
                 color: AppTheme.textSecondary,
@@ -37,32 +37,44 @@ class DashboardPage extends ConsumerWidget {
           ],
         ),
         toolbarHeight: 64,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(
+            height: 0.5,
+            color: AppTheme.divider,
+          ),
+        ),
       ),
       body: judgments.when(
-        loading: () => const LoadingWidget(message: 'Loading judgments...'),
+        loading: () => const LoadingWidget(message: '加载判断中...'),
         error: (err, _) => AppErrorWidget(
-          message: 'Failed to load judgments:\n$err',
+          message: '加载失败:\n$err',
           onRetry: () => ref.invalidate(latestJudgmentsProvider),
         ),
         data: (list) {
           if (list.isEmpty) {
             return const Center(
               child: Text(
-                'No judgments yet.\nWaiting for AI analysis cycle.',
+                '暂无判断\n等待AI分析周期',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
             );
           }
           return RefreshIndicator(
-            color: AppTheme.accent,
+            color: AppTheme.primary,
             onRefresh: () async {
               ref.invalidate(latestJudgmentsProvider);
               await ref.read(latestJudgmentsProvider.future);
             },
-            child: ListView.builder(
-              padding: const EdgeInsets.only(top: 8, bottom: 24),
+            child: ListView.separated(
+              padding: const EdgeInsets.only(top: 0, bottom: 24),
               itemCount: list.length,
+              separatorBuilder: (_, _) => const Divider(
+                height: 0.5,
+                indent: 72,
+                color: AppTheme.divider,
+              ),
               itemBuilder: (context, index) =>
                   JudgmentCard(judgment: list[index]),
             ),

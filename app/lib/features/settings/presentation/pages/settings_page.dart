@@ -6,7 +6,7 @@ import '../../../../core/config/api_config.dart';
 import '../../../../core/providers/dio_provider.dart';
 import '../../../../core/theme/app_theme.dart';
 
-/// Settings page with server info, trigger button, and about section.
+/// Settings page — iOS Settings grouped list style.
 class SettingsPage extends ConsumerStatefulWidget {
   const SettingsPage({super.key});
 
@@ -30,11 +30,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
           data: {'horizon_hours': 4});
       final triggered = response.data['triggered'] ?? 0;
       setState(() {
-        _triggerResult = 'Triggered $triggered judgments successfully.';
+        _triggerResult = '成功触发 $triggered 个判断';
       });
     } on DioException catch (e) {
       setState(() {
-        _triggerResult = 'Failed: ${e.message}';
+        _triggerResult = '失败: ${e.message}';
       });
     } finally {
       setState(() {
@@ -46,165 +46,180 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Settings')),
+      appBar: AppBar(
+        title: const Text(
+          '我的',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(height: 0.5, color: AppTheme.divider),
+        ),
+      ),
       body: ListView(
-        padding: const EdgeInsets.all(16),
+        padding: const EdgeInsets.only(bottom: 32),
         children: [
-          // Server URL
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.dns_outlined, color: AppTheme.accent),
-              title: const Text('Server URL'),
-              subtitle: const Text(
-                ApiConfig.baseUrl,
-                style: TextStyle(
-                  color: AppTheme.accent,
-                  fontFamily: 'monospace',
-                  fontSize: 12,
-                ),
-              ),
+          // Section: 系统
+          _sectionHeader('系统'),
+          _groupedContainer([
+            _settingsRow(
+              icon: Icons.dns_outlined,
+              title: '服务器地址',
+              subtitle: ApiConfig.baseUrl,
             ),
-          ),
-
-          const SizedBox(height: 8),
-
-          // App version
-          Card(
-            child: ListTile(
-              leading: const Icon(Icons.info_outline, color: AppTheme.accent),
-              title: const Text('App Version'),
-              subtitle: const Text('1.0.0'),
-            ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // Trigger judgment button
-          const Text(
-            'Actions',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.stretch,
-                children: [
-                  const Text(
-                    'Manually trigger an AI judgment cycle across all active markets.',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 13,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  ElevatedButton.icon(
-                    onPressed: _triggering ? null : _triggerJudgment,
-                    icon: _triggering
-                        ? const SizedBox(
-                            width: 16,
-                            height: 16,
-                            child: CircularProgressIndicator(
-                              strokeWidth: 2,
-                              color: AppTheme.textPrimary,
-                            ),
-                          )
-                        : const Icon(Icons.play_arrow),
-                    label: Text(_triggering
-                        ? 'Triggering...'
-                        : 'Trigger Judgment Cycle'),
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: AppTheme.accent,
-                      foregroundColor: AppTheme.background,
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(10),
+            _settingsRow(
+              icon: Icons.play_circle_outline,
+              title: '触发判断',
+              subtitle: _triggering
+                  ? '触发中...'
+                  : (_triggerResult ?? '手动触发一次AI判断周期'),
+              trailing: _triggering
+                  ? const SizedBox(
+                      width: 18,
+                      height: 18,
+                      child: CircularProgressIndicator(
+                        strokeWidth: 2,
+                        color: AppTheme.primary,
                       ),
+                    )
+                  : const Icon(Icons.chevron_right,
+                      color: AppTheme.divider, size: 18),
+              onTap: _triggering ? null : _triggerJudgment,
+              subtitleColor: _triggerResult != null
+                  ? (_triggerResult!.startsWith('失败')
+                      ? AppTheme.downRed
+                      : AppTheme.upGreen)
+                  : null,
+            ),
+          ]),
+
+          // Section: 关于
+          _sectionHeader('关于'),
+          _groupedContainer([
+            _settingsRow(
+              icon: Icons.info_outline,
+              title: '版本',
+              subtitle: '1.0.0',
+            ),
+            _settingsRow(
+              icon: Icons.code,
+              title: 'GitHub',
+              subtitle: 'github.com/TY-Trading',
+            ),
+            _settingsRow(
+              icon: Icons.description_outlined,
+              title: '项目介绍',
+              subtitle: '天演 — AI金融世界模型，每4小时多模型共识判断',
+            ),
+          ]),
+
+          // Section: 设置
+          _sectionHeader('设置'),
+          _groupedContainer([
+            _settingsRow(
+              icon: Icons.notifications_outlined,
+              title: '通知设置',
+              subtitle: '即将推出',
+            ),
+            _settingsRow(
+              icon: Icons.language,
+              title: '语言',
+              subtitle: '简体中文',
+            ),
+          ]),
+        ],
+      ),
+    );
+  }
+
+  Widget _sectionHeader(String title) {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(16, 24, 16, 8),
+      child: Text(
+        title,
+        style: const TextStyle(
+          fontSize: 13,
+          fontWeight: FontWeight.w500,
+          color: AppTheme.textSecondary,
+        ),
+      ),
+    );
+  }
+
+  Widget _groupedContainer(List<Widget> children) {
+    return Container(
+      decoration: const BoxDecoration(
+        color: AppTheme.background,
+        border: Border(
+          top: BorderSide(color: AppTheme.divider, width: 0.5),
+          bottom: BorderSide(color: AppTheme.divider, width: 0.5),
+        ),
+      ),
+      child: Column(
+        children: children.asMap().entries.map((e) {
+          final isLast = e.key == children.length - 1;
+          return Column(
+            children: [
+              e.value,
+              if (!isLast)
+                const Padding(
+                  padding: EdgeInsets.only(left: 52),
+                  child: Divider(height: 0.5, color: AppTheme.divider),
+                ),
+            ],
+          );
+        }).toList(),
+      ),
+    );
+  }
+
+  Widget _settingsRow({
+    required IconData icon,
+    required String title,
+    String? subtitle,
+    Widget? trailing,
+    VoidCallback? onTap,
+    Color? subtitleColor,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Row(
+          children: [
+            Icon(icon, color: AppTheme.primary, size: 22),
+            const SizedBox(width: 14),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: const TextStyle(
+                      color: AppTheme.textPrimary,
+                      fontSize: 15,
                     ),
                   ),
-                  if (_triggerResult != null) ...[
-                    const SizedBox(height: 12),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
                     Text(
-                      _triggerResult!,
+                      subtitle,
                       style: TextStyle(
-                        color: _triggerResult!.startsWith('Failed')
-                            ? AppTheme.downRed
-                            : AppTheme.upGreen,
-                        fontSize: 13,
+                        color: subtitleColor ?? AppTheme.textSecondary,
+                        fontSize: 12,
                       ),
                     ),
                   ],
                 ],
               ),
             ),
-          ),
-
-          const SizedBox(height: 24),
-
-          // About TY
-          const Text(
-            'About TY',
-            style: TextStyle(
-              fontSize: 18,
-              fontWeight: FontWeight.bold,
-              color: AppTheme.textPrimary,
-            ),
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  const Text(
-                    'TY (天演) — AI Financial World Model',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: AppTheme.accent,
-                      fontSize: 15,
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  const Text(
-                    'An AI system that autonomously perceives, reasons, and evolves '
-                    'across all financial markets. Every 4 hours, multiple AI models '
-                    '(Claude, GPT-4o, Gemini) reach consensus on market direction, '
-                    'confidence, and rational price for each tracked asset.\n\n'
-                    'The system tracks its own accuracy and calibration over time, '
-                    'enabling continuous self-improvement through evolutionary feedback.',
-                    style: TextStyle(
-                      color: AppTheme.textSecondary,
-                      fontSize: 13,
-                      height: 1.5,
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-                  Row(
-                    children: [
-                      const Icon(Icons.code, color: AppTheme.flatGray, size: 16),
-                      const SizedBox(width: 8),
-                      Text(
-                        'github.com/TY-Trading',
-                        style: TextStyle(
-                          color: AppTheme.accent.withValues(alpha: 0.8),
-                          fontSize: 13,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SizedBox(height: 32),
-        ],
+            ?trailing,
+          ],
+        ),
       ),
     );
   }

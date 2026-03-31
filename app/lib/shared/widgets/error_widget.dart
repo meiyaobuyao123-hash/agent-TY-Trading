@@ -29,13 +29,12 @@ class AppErrorWidget extends StatelessWidget {
             ),
             if (onRetry != null) ...[
               const SizedBox(height: 16),
-              OutlinedButton.icon(
+              TextButton.icon(
                 onPressed: onRetry,
                 icon: const Icon(Icons.refresh),
-                label: const Text('Retry'),
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: AppTheme.accent,
-                  side: const BorderSide(color: AppTheme.accent),
+                label: const Text('重试'),
+                style: TextButton.styleFrom(
+                  foregroundColor: AppTheme.primary,
                 ),
               ),
             ],

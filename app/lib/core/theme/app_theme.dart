@@ -1,34 +1,38 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
-/// Dark trading theme inspired by Bloomberg Terminal.
+/// Apple-style light theme — clean, minimal, professional.
 class AppTheme {
   AppTheme._();
 
   // Core colors
-  static const Color background = Color(0xFF0A0F1E);
-  static const Color surface = Color(0xFF111827);
-  static const Color accent = Color(0xFF00D4FF);
-  static const Color upGreen = Color(0xFF10B981);
-  static const Color downRed = Color(0xFFEF4444);
-  static const Color flatGray = Color(0xFF64748B);
-  static const Color textPrimary = Color(0xFFE2E8F0);
-  static const Color textSecondary = Color(0xFF94A3B8);
-  static const Color cardBorder = Color(0xFF1E293B);
+  static const Color background = Color(0xFFFFFFFF);
+  static const Color surface = Color(0xFFF5F5F7);
+  static const Color primary = Color(0xFF007AFF);
+  static const Color textPrimary = Color(0xFF1D1D1F);
+  static const Color textSecondary = Color(0xFF86868B);
+  static const Color upGreen = Color(0xFF34C759);
+  static const Color downRed = Color(0xFFFF3B30);
+  static const Color flatGray = Color(0xFF8E8E93);
+  static const Color divider = Color(0xFFE5E5EA);
 
-  static ThemeData get darkTheme => ThemeData(
-        brightness: Brightness.dark,
+  // Legacy aliases (so existing code compiles without changes)
+  static const Color accent = primary;
+  static const Color cardBorder = divider;
+
+  static ThemeData get lightTheme => ThemeData(
+        brightness: Brightness.light,
         scaffoldBackgroundColor: background,
-        colorScheme: const ColorScheme.dark(
-          primary: accent,
-          secondary: accent,
+        colorScheme: const ColorScheme.light(
+          primary: primary,
+          secondary: primary,
           surface: surface,
           error: downRed,
         ),
         cardTheme: CardThemeData(
-          color: surface,
+          color: background,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
-            side: const BorderSide(color: cardBorder, width: 1),
           ),
           elevation: 0,
           margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
@@ -37,14 +41,18 @@ class AppTheme {
           backgroundColor: background,
           foregroundColor: textPrimary,
           elevation: 0,
+          scrolledUnderElevation: 0,
           centerTitle: true,
+          systemOverlayStyle: SystemUiOverlayStyle.dark,
         ),
         bottomNavigationBarTheme: const BottomNavigationBarThemeData(
-          backgroundColor: surface,
-          selectedItemColor: accent,
-          unselectedItemColor: textSecondary,
+          backgroundColor: background,
+          selectedItemColor: primary,
+          unselectedItemColor: flatGray,
           type: BottomNavigationBarType.fixed,
+          elevation: 0,
         ),
+        dividerColor: divider,
         textTheme: const TextTheme(
           headlineLarge: TextStyle(
             color: textPrimary,
@@ -71,4 +79,7 @@ class AppTheme {
           bodySmall: TextStyle(color: textSecondary, fontSize: 12),
         ),
       );
+
+  // Keep darkTheme getter so app.dart compiles during transition
+  static ThemeData get darkTheme => lightTheme;
 }

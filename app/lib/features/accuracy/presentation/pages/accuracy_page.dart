@@ -8,7 +8,7 @@ import '../../../../shared/widgets/error_widget.dart';
 import '../../../../shared/widgets/loading_widget.dart';
 import '../../providers/accuracy_provider.dart';
 
-/// Accuracy page showing overall stats, bar chart by market type, and stat cards.
+/// Accuracy page — clean stats with bar chart.
 class AccuracyPage extends ConsumerWidget {
   const AccuracyPage({super.key});
 
@@ -17,25 +17,37 @@ class AccuracyPage extends ConsumerWidget {
     final statsAsync = ref.watch(accuracyProvider);
 
     return Scaffold(
-      appBar: AppBar(title: const Text('Accuracy')),
+      appBar: AppBar(
+        title: const Text(
+          '数据分析',
+          style: TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w600,
+            color: AppTheme.textPrimary,
+          ),
+        ),
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(0.5),
+          child: Container(height: 0.5, color: AppTheme.divider),
+        ),
+      ),
       body: statsAsync.when(
-        loading: () => const LoadingWidget(message: 'Loading accuracy...'),
+        loading: () => const LoadingWidget(message: '加载数据中...'),
         error: (err, _) => AppErrorWidget(
-          message: 'Failed to load accuracy data:\n$err',
+          message: '加载准确率数据失败:\n$err',
           onRetry: () => ref.invalidate(accuracyProvider),
         ),
         data: (stats) {
           if (stats.isEmpty) {
             return const Center(
               child: Text(
-                'No accuracy data yet.\nWaiting for settled judgments.',
+                '暂无数据\n等待判断结算',
                 textAlign: TextAlign.center,
                 style: TextStyle(color: AppTheme.textSecondary),
               ),
             );
           }
 
-          // Compute overall aggregates
           final totalJudgments =
               stats.fold<int>(0, (sum, s) => sum + s.totalJudgments);
           final correctJudgments =
@@ -43,29 +55,9 @@ class AccuracyPage extends ConsumerWidget {
           final overallAccuracy = totalJudgments > 0
               ? (correctJudgments / totalJudgments * 100)
               : 0.0;
-          final avgCalibration = stats.isNotEmpty
-              ? stats.fold<double>(0, (sum, s) => sum + s.calibrationErr) /
-                  stats.length
-              : 0.0;
-
-          // Average confidence (use calibration error as proxy if no direct field)
-          final avgConfidence = stats
-                  .where((s) => s.highConfAccuracy != null)
-                  .fold<double>(
-                      0,
-                      (sum, s) =>
-                          sum +
-                          (s.highConfAccuracy! +
-                                  (s.mediumConfAccuracy ?? 0) +
-                                  (s.lowConfAccuracy ?? 0)) /
-                              3) /
-              (stats
-                      .where((s) => s.highConfAccuracy != null)
-                      .length
-                      .clamp(1, 999));
 
           return RefreshIndicator(
-            color: AppTheme.accent,
+            color: AppTheme.primary,
             onRefresh: () async {
               ref.invalidate(accuracyProvider);
               await ref.read(accuracyProvider.future);
@@ -73,14 +65,18 @@ class AccuracyPage extends ConsumerWidget {
             child: ListView(
               padding: const EdgeInsets.all(16),
               children: [
-                // Big accuracy number
-                _BigAccuracyCard(accuracy: overallAccuracy),
+                // Big accuracy card
+                _BigAccuracyCard(
+                  accuracy: overallAccuracy,
+                  total: totalJudgments,
+                  correct: correctJudgments,
+                ),
 
                 const SizedBox(height: 24),
 
-                // Bar chart by market type
+                // Bar chart
                 const Text(
-                  'Accuracy by Market Type',
+                  '各市场准确率',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -95,9 +91,9 @@ class AccuracyPage extends ConsumerWidget {
 
                 const SizedBox(height: 24),
 
-                // Stat cards grid
+                // Stat cards
                 const Text(
-                  'Statistics',
+                  '分项数据',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -105,12 +101,9 @@ class AccuracyPage extends ConsumerWidget {
                   ),
                 ),
                 const SizedBox(height: 12),
-                _buildStatCards(
-                  totalJudgments: totalJudgments,
-                  correctJudgments: correctJudgments,
-                  avgConfidence: avgConfidence,
-                  calibrationErr: avgCalibration,
-                ),
+
+                // Per-market type cards
+                ...stats.map((s) => _MarketAccuracyCard(stat: s)),
               ],
             ),
           );
@@ -118,84 +111,47 @@ class AccuracyPage extends ConsumerWidget {
       ),
     );
   }
-
-  Widget _buildStatCards({
-    required int totalJudgments,
-    required int correctJudgments,
-    required double avgConfidence,
-    required double calibrationErr,
-  }) {
-    return GridView.count(
-      crossAxisCount: 2,
-      shrinkWrap: true,
-      physics: const NeverScrollableScrollPhysics(),
-      mainAxisSpacing: 12,
-      crossAxisSpacing: 12,
-      childAspectRatio: 1.6,
-      children: [
-        _StatCard(
-          label: 'Total Judgments',
-          value: totalJudgments.toString(),
-          icon: Icons.gavel,
-        ),
-        _StatCard(
-          label: 'Correct',
-          value: correctJudgments.toString(),
-          icon: Icons.check_circle_outline,
-          valueColor: AppTheme.upGreen,
-        ),
-        _StatCard(
-          label: 'Avg Confidence',
-          value: '${avgConfidence.toStringAsFixed(1)}%',
-          icon: Icons.speed,
-        ),
-        _StatCard(
-          label: 'Calibration Error',
-          value: '${calibrationErr.toStringAsFixed(2)}%',
-          icon: Icons.tune,
-          valueColor: calibrationErr < 5 ? AppTheme.upGreen : AppTheme.downRed,
-        ),
-      ],
-    );
-  }
 }
 
 class _BigAccuracyCard extends StatelessWidget {
   final double accuracy;
+  final int total;
+  final int correct;
 
-  const _BigAccuracyCard({required this.accuracy});
+  const _BigAccuracyCard({
+    required this.accuracy,
+    required this.total,
+    required this.correct,
+  });
 
   @override
   Widget build(BuildContext context) {
-    final color = accuracy >= 60
-        ? AppTheme.upGreen
-        : accuracy >= 40
-            ? AppTheme.accent
-            : AppTheme.downRed;
-
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(vertical: 32, horizontal: 24),
-        child: Column(
-          children: [
-            const Text(
-              'Overall Accuracy',
-              style: TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 14,
-              ),
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.symmetric(vertical: 40, horizontal: 24),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(16),
+      ),
+      child: Column(
+        children: [
+          Text(
+            '${accuracy.toStringAsFixed(1)}%',
+            style: const TextStyle(
+              fontSize: 56,
+              fontWeight: FontWeight.bold,
+              color: AppTheme.textPrimary,
             ),
-            const SizedBox(height: 8),
-            Text(
-              '${accuracy.toStringAsFixed(1)}%',
-              style: TextStyle(
-                fontSize: 56,
-                fontWeight: FontWeight.bold,
-                color: color,
-              ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            '共$total次判断，$correct次正确',
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 14,
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -208,87 +164,84 @@ class _AccuracyBarChart extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: BarChart(
-          BarChartData(
-            alignment: BarChartAlignment.spaceAround,
-            maxY: 100,
-            barTouchData: BarTouchData(enabled: true),
-            titlesData: FlTitlesData(
-              show: true,
-              bottomTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  getTitlesWidget: (value, meta) {
-                    final index = value.toInt();
-                    if (index < 0 || index >= stats.length) {
-                      return const SizedBox.shrink();
-                    }
-                    return Padding(
-                      padding: const EdgeInsets.only(top: 4),
-                      child: Text(
-                        _shortenType(stats[index].marketType),
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 10,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-              leftTitles: AxisTitles(
-                sideTitles: SideTitles(
-                  showTitles: true,
-                  reservedSize: 32,
-                  getTitlesWidget: (value, meta) {
-                    return Text(
-                      '${value.toInt()}%',
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(12),
+      ),
+      child: BarChart(
+        BarChartData(
+          alignment: BarChartAlignment.spaceAround,
+          maxY: 100,
+          barTouchData: BarTouchData(enabled: true),
+          titlesData: FlTitlesData(
+            show: true,
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= stats.length) {
+                    return const SizedBox.shrink();
+                  }
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 4),
+                    child: Text(
+                      _shortenType(stats[index].marketType),
                       style: const TextStyle(
                         color: AppTheme.textSecondary,
                         fontSize: 10,
                       ),
-                    );
-                  },
-                ),
-              ),
-              topTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-              rightTitles:
-                  const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-            ),
-            borderData: FlBorderData(show: false),
-            gridData: FlGridData(
-              show: true,
-              drawVerticalLine: false,
-              getDrawingHorizontalLine: (value) => FlLine(
-                color: AppTheme.cardBorder,
-                strokeWidth: 1,
+                    ),
+                  );
+                },
               ),
             ),
-            barGroups: stats.asMap().entries.map((entry) {
-              final acc = entry.value.accuracyPct;
-              final color = acc >= 60
-                  ? AppTheme.upGreen
-                  : acc >= 40
-                      ? AppTheme.accent
-                      : AppTheme.downRed;
-              return BarChartGroupData(
-                x: entry.key,
-                barRods: [
-                  BarChartRodData(
-                    toY: acc,
-                    color: color,
-                    width: 20,
-                    borderRadius:
-                        const BorderRadius.vertical(top: Radius.circular(4)),
-                  ),
-                ],
-              );
-            }).toList(),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 32,
+                getTitlesWidget: (value, meta) {
+                  return Text(
+                    '${value.toInt()}%',
+                    style: const TextStyle(
+                      color: AppTheme.textSecondary,
+                      fontSize: 10,
+                    ),
+                  );
+                },
+              ),
+            ),
+            topTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
+            rightTitles:
+                const AxisTitles(sideTitles: SideTitles(showTitles: false)),
           ),
+          borderData: FlBorderData(show: false),
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: false,
+            getDrawingHorizontalLine: (value) => FlLine(
+              color: AppTheme.divider,
+              strokeWidth: 0.5,
+            ),
+          ),
+          barGroups: stats.asMap().entries.map((entry) {
+            final acc = entry.value.accuracyPct;
+            return BarChartGroupData(
+              x: entry.key,
+              barRods: [
+                BarChartRodData(
+                  toY: acc,
+                  color: AppTheme.primary.withValues(alpha: 0.7),
+                  width: 20,
+                  borderRadius:
+                      const BorderRadius.vertical(top: Radius.circular(4)),
+                ),
+              ],
+            );
+          }).toList(),
         ),
       ),
     );
@@ -300,49 +253,49 @@ class _AccuracyBarChart extends StatelessWidget {
   }
 }
 
-class _StatCard extends StatelessWidget {
-  final String label;
-  final String value;
-  final IconData icon;
-  final Color? valueColor;
+class _MarketAccuracyCard extends StatelessWidget {
+  final AccuracyStat stat;
 
-  const _StatCard({
-    required this.label,
-    required this.value,
-    required this.icon,
-    this.valueColor,
-  });
+  const _MarketAccuracyCard({required this.stat});
 
   @override
   Widget build(BuildContext context) {
-    return Card(
-      margin: EdgeInsets.zero,
-      child: Padding(
-        padding: const EdgeInsets.all(14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(icon, color: AppTheme.accent, size: 20),
-            const Spacer(),
-            Text(
-              value,
-              style: TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-                color: valueColor ?? AppTheme.textPrimary,
-              ),
-            ),
-            const SizedBox(height: 2),
-            Text(
-              label,
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Text(
+              stat.marketType,
               style: const TextStyle(
-                color: AppTheme.textSecondary,
-                fontSize: 11,
+                color: AppTheme.textPrimary,
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
               ),
             ),
-          ],
-        ),
+          ),
+          Text(
+            '${stat.accuracyPct.toStringAsFixed(1)}%',
+            style: const TextStyle(
+              color: AppTheme.textPrimary,
+              fontSize: 17,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            '${stat.correctJudgments}/${stat.totalJudgments}',
+            style: const TextStyle(
+              color: AppTheme.textSecondary,
+              fontSize: 12,
+            ),
+          ),
+        ],
       ),
     );
   }
