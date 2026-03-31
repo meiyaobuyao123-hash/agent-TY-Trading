@@ -1,0 +1,15 @@
+[Unit]
+Description=TY Trading Backend
+After=postgresql.service redis.service
+
+[Service]
+Type=simple
+User=ubuntu
+WorkingDirectory=/opt/ty-backend
+EnvironmentFile=/opt/ty-backend/.env
+ExecStart=/opt/ty-backend/.venv/bin/uvicorn backend.main:app --host 0.0.0.0 --port 8003
+Restart=always
+RestartSec=5
+
+[Install]
+WantedBy=multi-user.target
