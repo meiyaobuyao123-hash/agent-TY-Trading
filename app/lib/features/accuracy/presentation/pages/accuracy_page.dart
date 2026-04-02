@@ -10,9 +10,17 @@ import '../../../../shared/widgets/error_widget.dart';
 import '../../../../shared/widgets/loading_widget.dart';
 import '../../providers/accuracy_provider.dart';
 
-/// Accuracy / Evolution page — Apple-style flat, minimalist, tech-forward UI.
-class AccuracyPage extends ConsumerWidget {
+/// Accuracy / Evolution page — reorganized into 3 tabs (R13).
+class AccuracyPage extends ConsumerStatefulWidget {
   const AccuracyPage({super.key});
+
+  @override
+  ConsumerState<AccuracyPage> createState() => _AccuracyPageState();
+}
+
+class _AccuracyPageState extends ConsumerState<AccuracyPage>
+    with SingleTickerProviderStateMixin {
+  late TabController _tabController;
 
   static const _typeLabels = {
     'crypto': '加密货币',
@@ -32,10 +40,23 @@ class AccuracyPage extends ConsumerWidget {
   }
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  void initState() {
+    super.initState();
+    _tabController = TabController(length: 3, vsync: this);
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final statsAsync = ref.watch(accuracyProvider);
 
     return Scaffold(
+      backgroundColor: AppTheme.backgroundOf(context),
       body: SafeArea(
         child: statsAsync.when(
           loading: () => const LoadingWidget(message: '加载数据中...'),
@@ -88,30 +109,13 @@ class AccuracyPage extends ConsumerWidget {
       );
     }
 
-    final totalJudgments =
-        stats.fold<int>(0, (sum, s) => sum + s.totalJudgments);
-    final correctJudgments =
-        stats.fold<int>(0, (sum, s) => sum + s.correctJudgments);
-    final overallAccuracy =
-        totalJudgments > 0 ? (correctJudgments / totalJudgments * 100) : 0.0;
-
-    // Sort stats by accuracy for preference ranking
-    final sortedByAccuracy = List<AccuracyStat>.from(stats)
-      ..sort((a, b) => b.accuracyPct.compareTo(a.accuracyPct));
-
-    return RefreshIndicator(
-      color: AppTheme.primary,
-      onRefresh: () async {
-        ref.invalidate(accuracyProvider);
-        ref.invalidate(accuracyHistoryProvider);
-        await ref.read(accuracyProvider.future);
-      },
-      child: ListView(
-        padding: const EdgeInsets.symmetric(horizontal: 24),
-        children: [
-          // Large title
-          const Padding(
-            padding: EdgeInsets.only(top: 16, bottom: 12),
+    return Column(
+      children: [
+        // Title
+        const Padding(
+          padding: EdgeInsets.fromLTRB(24, 16, 24, 0),
+          child: Align(
+            alignment: Alignment.centerLeft,
             child: Text(
               'AI 进化',
               style: TextStyle(
@@ -122,7 +126,78 @@ class AccuracyPage extends ConsumerWidget {
               ),
             ),
           ),
+        ),
+        const SizedBox(height: 12),
+        // Tab bar
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 24),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: TabBar(
+            controller: _tabController,
+            indicatorSize: TabBarIndicatorSize.tab,
+            indicator: BoxDecoration(
+              color: AppTheme.primary,
+              borderRadius: BorderRadius.circular(10),
+            ),
+            labelColor: Colors.white,
+            unselectedLabelColor: AppTheme.textSecondary,
+            labelStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+            ),
+            unselectedLabelStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+            dividerHeight: 0,
+            tabs: const [
+              Tab(text: '概览'),
+              Tab(text: '详细'),
+              Tab(text: '进化'),
+            ],
+          ),
+        ),
+        const SizedBox(height: 16),
+        // Tab content
+        Expanded(
+          child: TabBarView(
+            controller: _tabController,
+            children: [
+              _buildOverviewTab(ref, stats),
+              _buildDetailTab(ref, stats),
+              _buildEvolutionTab(ref),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
 
+  // ═══════════════════════════════════════════════
+  // Tab 1: 概览 — Accuracy ring + trend + sentiment
+  // ═══════════════════════════════════════════════
+  Widget _buildOverviewTab(WidgetRef ref, List<AccuracyStat> stats) {
+    final totalJudgments =
+        stats.fold<int>(0, (sum, s) => sum + s.totalJudgments);
+    final correctJudgments =
+        stats.fold<int>(0, (sum, s) => sum + s.correctJudgments);
+    final overallAccuracy =
+        totalJudgments > 0 ? (correctJudgments / totalJudgments * 100) : 0.0;
+
+    return RefreshIndicator(
+      color: AppTheme.primary,
+      onRefresh: () async {
+        ref.invalidate(accuracyProvider);
+        ref.invalidate(accuracyHistoryProvider);
+        ref.invalidate(brierScoreProvider);
+        await ref.read(accuracyProvider.future);
+      },
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        children: [
           // Accuracy explanation
           Container(
             margin: const EdgeInsets.only(bottom: 20),
@@ -187,35 +262,188 @@ class AccuracyPage extends ConsumerWidget {
             ),
           ),
 
-          const SizedBox(height: 32),
+          const SizedBox(height: 24),
 
-          // ── Accuracy trend chart ──
+          // Brier score section (R13)
+          _BrierScoreSection(),
+
+          const SizedBox(height: 24),
+
+          // Accuracy trend chart
           _AccuracyTrendSection(),
 
           const SizedBox(height: 24),
 
-          // ── Model performance section ──
+          // Market sentiment
+          _buildMarketSentimentSection(ref),
+
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMarketSentimentSection(WidgetRef ref) {
+    final overviewAsync = ref.watch(overviewStatsForEvolutionProvider);
+
+    return overviewAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (data) {
+        final breadth = data['market_breadth'] as Map<String, dynamic>?;
+        if (breadth == null) return const SizedBox.shrink();
+
+        final upCount = breadth['up_count'] as int? ?? 0;
+        final downCount = breadth['down_count'] as int? ?? 0;
+        final flatCount = breadth['flat_count'] as int? ?? 0;
+        final mood = breadth['mood'] as String? ?? '中性';
+
+        Color moodColor;
+        if (mood == '贪婪') {
+          moodColor = AppTheme.upGreen;
+        } else if (mood == '恐慌') {
+          moodColor = AppTheme.downRed;
+        } else {
+          moodColor = const Color(0xFFFFCC00);
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: moodColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Icon(Icons.sentiment_satisfied_rounded,
+                        size: 16, color: moodColor),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    '市场情绪',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: moodColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      mood,
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: moodColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              // Sentiment bar
+              ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: SizedBox(
+                  height: 8,
+                  child: Row(
+                    children: [
+                      if (upCount > 0)
+                        Flexible(
+                          flex: upCount,
+                          child: Container(color: AppTheme.upGreen),
+                        ),
+                      if (flatCount > 0)
+                        Flexible(
+                          flex: flatCount,
+                          child: Container(
+                              color: const Color(0xFFFFCC00)),
+                        ),
+                      if (downCount > 0)
+                        Flexible(
+                          flex: downCount,
+                          child: Container(color: AppTheme.downRed),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 10),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '上涨 $upCount',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.upGreen,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '平盘 $flatCount',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: Color(0xFFFFCC00),
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                  Text(
+                    '下跌 $downCount',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.downRed,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // Tab 2: 详细 — Market type breakdown + model perf
+  // ═══════════════════════════════════════════════
+  Widget _buildDetailTab(WidgetRef ref, List<AccuracyStat> stats) {
+    final sortedByAccuracy = List<AccuracyStat>.from(stats)
+      ..sort((a, b) => b.accuracyPct.compareTo(a.accuracyPct));
+
+    return RefreshIndicator(
+      color: AppTheme.primary,
+      onRefresh: () async {
+        ref.invalidate(accuracyProvider);
+        await ref.read(accuracyProvider.future);
+      },
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        children: [
+          // Model performance section
           _buildModelPerformanceSection(stats),
 
           const SizedBox(height: 24),
 
-          // ── Market type preference section ──
+          // Market type preference section
           _buildMarketPreferenceSection(sortedByAccuracy),
-
-          const SizedBox(height: 24),
-
-          // ── Accuracy by Hour heatmap (L4) ──
-          _AccuracyByHourSection(),
-
-          const SizedBox(height: 24),
-
-          // ── Strategy Genome Status (L4) ──
-          _GenomeStatusSection(),
-
-          const SizedBox(height: 24),
-
-          // ── Bias Report section (L3 Cognitive Bias Hunter) ──
-          _BiasReportSection(),
 
           const SizedBox(height: 24),
 
@@ -238,6 +466,40 @@ class AccuracyPage extends ConsumerWidget {
                 stat: s,
                 localizedType: _localizedType(s.marketType),
               )),
+
+          const SizedBox(height: 32),
+        ],
+      ),
+    );
+  }
+
+  // ═══════════════════════════════════════════════
+  // Tab 3: 进化 — Genome + heatmap + bias
+  // ═══════════════════════════════════════════════
+  Widget _buildEvolutionTab(WidgetRef ref) {
+    return RefreshIndicator(
+      color: AppTheme.primary,
+      onRefresh: () async {
+        ref.invalidate(genomeStatusProvider);
+        ref.invalidate(accuracyByHourProvider);
+        ref.invalidate(biasReportProvider);
+        await ref.read(genomeStatusProvider.future);
+      },
+      child: ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 24),
+        children: [
+          // Strategy genome section
+          _GenomeStatusSection(),
+
+          const SizedBox(height: 24),
+
+          // Accuracy by hour heatmap
+          _AccuracyByHourSection(),
+
+          const SizedBox(height: 24),
+
+          // Bias report
+          _BiasReportSection(),
 
           const SizedBox(height: 32),
         ],
@@ -315,7 +577,7 @@ class AccuracyPage extends ConsumerWidget {
           Container(
             padding: const EdgeInsets.all(14),
             decoration: BoxDecoration(
-              color: AppTheme.background,
+              color: AppTheme.backgroundOf(context),
               borderRadius: BorderRadius.circular(10),
             ),
             child: Column(
@@ -448,14 +710,13 @@ class AccuracyPage extends ConsumerWidget {
               padding: const EdgeInsets.only(bottom: 8),
               child: Row(
                 children: [
-                  // Rank badge
                   Container(
                     width: 24,
                     height: 24,
                     decoration: BoxDecoration(
                       color: isTop
                           ? const Color(0xFFFFF3CD)
-                          : AppTheme.background,
+                          : AppTheme.backgroundOf(context),
                       borderRadius: BorderRadius.circular(6),
                     ),
                     child: Center(
@@ -505,6 +766,198 @@ class AccuracyPage extends ConsumerWidget {
   }
 }
 
+// ═══════════════════════════════════════════════
+// Brier Score Section (R13)
+// ═══════════════════════════════════════════════
+class _BrierScoreSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dataAsync = ref.watch(brierScoreProvider);
+
+    return dataAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (data) {
+        final brierScore = (data['brier_score'] as num?)?.toDouble();
+        if (brierScore == null) return const SizedBox.shrink();
+
+        final brierByType =
+            (data['brier_by_type'] as List<dynamic>?) ?? [];
+
+        // Determine quality
+        String qualityLabel;
+        Color qualityColor;
+        if (brierScore < 0.15) {
+          qualityLabel = '优秀';
+          qualityColor = AppTheme.upGreen;
+        } else if (brierScore < 0.25) {
+          qualityLabel = '良好';
+          qualityColor = const Color(0xFFFFCC00);
+        } else {
+          qualityLabel = '待提升';
+          qualityColor = AppTheme.downRed;
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: qualityColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Icon(Icons.speed_rounded,
+                        size: 16, color: qualityColor),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    'Brier分数',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                  const Spacer(),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: qualityColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      qualityLabel,
+                      style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: qualityColor,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              // Score display
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
+                  Text(
+                    brierScore.toStringAsFixed(4),
+                    style: TextStyle(
+                      fontSize: 32,
+                      fontWeight: FontWeight.w700,
+                      color: qualityColor,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                      letterSpacing: -0.5,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  const Padding(
+                    padding: EdgeInsets.only(bottom: 5),
+                    child: Text(
+                      '(越低越好)',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Container(
+                padding: const EdgeInsets.symmetric(
+                    horizontal: 10, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.06),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(Icons.info_outline_rounded,
+                        size: 13, color: AppTheme.primary),
+                    SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        'Brier分数衡量概率预测的校准质量。0=完美，0.25=随机猜测。',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: AppTheme.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // By-type breakdown
+              if (brierByType.isNotEmpty) ...[
+                const SizedBox(height: 14),
+                ...brierByType.map((bt) {
+                  final mt = bt['market_type'] as String? ?? '';
+                  final score =
+                      (bt['brier_score'] as num?)?.toDouble() ?? 0.0;
+                  final count = bt['count'] as int? ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        Expanded(
+                          child: Text(
+                            mt,
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                        Text(
+                          score.toStringAsFixed(4),
+                          style: TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w600,
+                            color: score < 0.15
+                                ? AppTheme.upGreen
+                                : score < 0.25
+                                    ? const Color(0xFFFFCC00)
+                                    : AppTheme.downRed,
+                            fontFeatures: const [
+                              FontFeature.tabularFigures()
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Text(
+                          '($count次)',
+                          style: const TextStyle(
+                            fontSize: 11,
+                            color: AppTheme.textSecondary,
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
 /// Custom painter for the circular accuracy ring.
 class _AccuracyRingPainter extends CustomPainter {
   final double percentage;
@@ -522,7 +975,6 @@ class _AccuracyRingPainter extends CustomPainter {
     final center = Offset(size.width / 2, size.height / 2);
     final radius = (math.min(size.width, size.height) - 10) / 2;
 
-    // Track background
     final trackPaint = Paint()
       ..color = const Color(0xFFF2F2F7)
       ..style = PaintingStyle.stroke
@@ -531,7 +983,6 @@ class _AccuracyRingPainter extends CustomPainter {
 
     canvas.drawCircle(center, radius, trackPaint);
 
-    // Fill arc
     if (percentage > 0) {
       final fillPaint = Paint()
         ..color = _ringColor()
@@ -544,7 +995,7 @@ class _AccuracyRingPainter extends CustomPainter {
 
       canvas.drawArc(
         rect,
-        -math.pi / 2, // Start from top
+        -math.pi / 2,
         sweepAngle,
         false,
         fillPaint,
@@ -558,7 +1009,7 @@ class _AccuracyRingPainter extends CustomPainter {
   }
 }
 
-/// Accuracy trend line chart section — fetches history from API.
+/// Accuracy trend line chart section.
 class _AccuracyTrendSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -657,7 +1108,6 @@ class _AccuracyTrendSection extends ConsumerWidget {
     final chartMin = (minVal - padding).clamp(0.0, 100.0);
     final chartMax = (maxVal + padding).clamp(0.0, 100.0);
 
-    // Determine trend
     final isUp = history.last.accuracyPct >= history.first.accuracyPct;
     final lineColor = isUp ? AppTheme.upGreen : AppTheme.downRed;
 
@@ -766,7 +1216,7 @@ class _AccuracyTrendSection extends ConsumerWidget {
   }
 }
 
-/// Bias Report section — shows cognitive bias statistics (L3).
+/// Bias Report section.
 class _BiasReportSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -861,7 +1311,6 @@ class _BiasReportSection extends ConsumerWidget {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Summary row
         Row(
           children: [
             _biasMetric('偏差检出率', '${biasRate.toStringAsFixed(1)}%'),
@@ -870,14 +1319,12 @@ class _BiasReportSection extends ConsumerWidget {
           ],
         ),
         const SizedBox(height: 14),
-        // Bias type bars
         ...biasTypes.map((bt) {
           final label = bt['label'] as String? ?? '';
           final count = bt['count'] as int? ?? 0;
           final pct = bt['pct_of_judgments'] as num? ?? 0;
           final accBiased = bt['accuracy_when_biased'] as num?;
           final accUnbiased = bt['accuracy_when_unbiased'] as num?;
-
           final biasIcon = _biasIcon(bt['type'] as String? ?? '');
 
           return Padding(
@@ -950,7 +1397,6 @@ class _BiasReportSection extends ConsumerWidget {
             ),
           );
         }),
-        // Insight
         if (insight.isNotEmpty) ...[
           const SizedBox(height: 6),
           Container(
@@ -1043,7 +1489,7 @@ class _MarketAccuracyCard extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 10),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.background,
+        color: AppTheme.backgroundOf(context),
         borderRadius: BorderRadius.circular(12),
         boxShadow: [
           BoxShadow(
@@ -1056,7 +1502,6 @@ class _MarketAccuracyCard extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // Top row: name + percentage
           Row(
             children: [
               Expanded(
@@ -1081,7 +1526,6 @@ class _MarketAccuracyCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 10),
-          // Progress bar
           ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: SizedBox(
@@ -1094,7 +1538,6 @@ class _MarketAccuracyCard extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 8),
-          // Bottom label
           Text(
             '${stat.correctJudgments}/${stat.totalJudgments} 判断正确',
             style: const TextStyle(
@@ -1108,7 +1551,7 @@ class _MarketAccuracyCard extends StatelessWidget {
   }
 }
 
-/// Accuracy by Hour heatmap section (L4).
+/// Accuracy by Hour heatmap section.
 class _AccuracyByHourSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1191,11 +1634,9 @@ class _AccuracyByHourSection extends ConsumerWidget {
           style: TextStyle(color: AppTheme.textSecondary, fontSize: 13));
     }
 
-    // Build a 4x6 grid (4 rows of 6 hours each)
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        // Heatmap grid
         Wrap(
           spacing: 3,
           runSpacing: 3,
@@ -1214,8 +1655,7 @@ class _AccuracyByHourSection extends ConsumerWidget {
               cellColor = AppTheme.upGreen.withValues(
                   alpha: 0.2 + (pct - 60) / 40 * 0.6);
             } else if (pct >= 40) {
-              cellColor = const Color(0xFFFFCC00).withValues(
-                  alpha: 0.3);
+              cellColor = const Color(0xFFFFCC00).withValues(alpha: 0.3);
             } else {
               cellColor = AppTheme.downRed.withValues(
                   alpha: 0.2 + (40 - pct) / 40 * 0.4);
@@ -1293,7 +1733,7 @@ class _AccuracyByHourSection extends ConsumerWidget {
   }
 }
 
-/// Strategy Genome Status section (L4 Self-Evolution).
+/// Strategy Genome Status section.
 class _GenomeStatusSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -1446,7 +1886,6 @@ class _GenomeStatusSection extends ConsumerWidget {
                 ],
               ),
               const SizedBox(height: 8),
-              // Weight bar visualization
               _weightBar('动量',
                   (weights['momentum_weight'] as num?)?.toDouble() ?? 0.5),
               _weightBar('逆势',

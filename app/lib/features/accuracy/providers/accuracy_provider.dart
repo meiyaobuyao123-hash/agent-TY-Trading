@@ -48,3 +48,17 @@ final genomeStatusProvider =
   final repo = ref.watch(accuracyRepositoryProvider);
   return repo.fetchGenomeStatus();
 });
+
+/// Provides Brier score data from overview (R13).
+final brierScoreProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchOverviewStats();
+});
+
+/// Provides overview stats for evolution page's market sentiment section.
+final overviewStatsForEvolutionProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchOverviewStats();
+});

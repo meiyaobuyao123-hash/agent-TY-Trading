@@ -25,6 +25,8 @@ class DashboardPage extends ConsumerStatefulWidget {
 class _DashboardPageState extends ConsumerState<DashboardPage> {
   bool _showOnboarding = false;
   bool _onboardingChecked = false;
+  bool _showAllSignals = false;
+  static const int _initialSignalCount = 20;
 
   @override
   void initState() {
@@ -761,7 +763,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       return bDevAbs.compareTo(aDevAbs);
     });
 
-    return validList
+    // Limit to top N by confidence on initial load (R13 performance)
+    final displayList = _showAllSignals
+        ? validList
+        : validList.take(_initialSignalCount).toList();
+    final hasMore = validList.length > _initialSignalCount && !_showAllSignals;
+
+    final cards = displayList
         .map((j) => Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _buildSignalCard(context, j,
@@ -771,6 +779,37 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   }),
             ))
         .toList();
+
+    if (hasMore) {
+      cards.add(
+        Padding(
+          padding: const EdgeInsets.only(top: 4, bottom: 10),
+          child: SizedBox(
+            width: double.infinity,
+            child: TextButton(
+              onPressed: () => setState(() => _showAllSignals = true),
+              style: TextButton.styleFrom(
+                foregroundColor: AppTheme.primary,
+                padding: const EdgeInsets.symmetric(vertical: 14),
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                backgroundColor: AppTheme.primary.withValues(alpha: 0.08),
+              ),
+              child: Text(
+                '查看更多 (${validList.length - _initialSignalCount}个市场)',
+                style: const TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ),
+        ),
+      );
+    }
+
+    return cards;
   }
 
   Widget _buildHeader() {

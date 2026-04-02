@@ -26,11 +26,19 @@ class MarketBreadth(BaseModel):
     mood: str = "中性"
 
 
+class BrierScoreByType(BaseModel):
+    market_type: str
+    brier_score: float
+    count: int
+
+
 class OverviewResponse(BaseModel):
     days_running: int
     total_judgments: int
     settled_judgments: int
     overall_accuracy: float
+    brier_score: Optional[float] = None
+    brier_by_type: list[BrierScoreByType] = []
     markets_tracked: int
     markets_with_data: int
     active_models: list[str]
@@ -145,11 +153,68 @@ async def get_overview(
     except Exception:
         pass
 
+    # Brier score calculation (R13) — measures calibration quality
+    brier_score = None
+    brier_by_type: list[BrierScoreByType] = []
+    try:
+        brier_stmt = (
+            select(Judgment, Settlement, Market.market_type)
+            .join(Settlement, Settlement.judgment_id == Judgment.id)
+            .join(Market, Market.id == Judgment.market_id)
+            .where(Settlement.is_correct.isnot(None))
+        )
+        brier_result = await session.execute(brier_stmt)
+        brier_rows = brier_result.all()
+
+        if brier_rows:
+            total_brier = 0.0
+            count_brier = 0
+            type_brier: dict[str, list[float]] = {}
+
+            for j, s, mt in brier_rows:
+                # Get the predicted probability for the actual outcome
+                actual_dir = s.actual_direction or ("up" if s.is_correct else "down")
+                # Map actual direction to the predicted probability
+                if actual_dir == "up":
+                    pred_prob = j.up_probability if j.up_probability is not None else (
+                        j.confidence_score if j.direction == "up" else (1.0 - j.confidence_score) * 0.5
+                    )
+                elif actual_dir == "down":
+                    pred_prob = j.down_probability if j.down_probability is not None else (
+                        j.confidence_score if j.direction == "down" else (1.0 - j.confidence_score) * 0.5
+                    )
+                else:
+                    pred_prob = j.flat_probability if j.flat_probability is not None else (
+                        j.confidence_score if j.direction == "flat" else (1.0 - j.confidence_score) * 0.5
+                    )
+
+                # Brier score: (predicted_probability - actual_outcome)^2
+                # actual_outcome = 1.0 (the event happened)
+                brier_val = (pred_prob - 1.0) ** 2
+                total_brier += brier_val
+                count_brier += 1
+
+                type_brier.setdefault(mt, []).append(brier_val)
+
+            if count_brier > 0:
+                brier_score = round(total_brier / count_brier, 4)
+
+            for mt, vals in sorted(type_brier.items()):
+                brier_by_type.append(BrierScoreByType(
+                    market_type=mt,
+                    brier_score=round(sum(vals) / len(vals), 4),
+                    count=len(vals),
+                ))
+    except Exception:
+        pass
+
     return OverviewResponse(
         days_running=days_running,
         total_judgments=total_judgments,
         settled_judgments=settled_judgments,
         overall_accuracy=overall_accuracy,
+        brier_score=brier_score,
+        brier_by_type=brier_by_type,
         markets_tracked=markets_tracked,
         markets_with_data=markets_with_data,
         active_models=active_models,

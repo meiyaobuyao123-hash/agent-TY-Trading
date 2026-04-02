@@ -48,10 +48,17 @@ SYSTEM_PROMPT = """你是一位资深金融分析AI，精通加密货币、股�
 请仅返回有效的JSON（不要markdown，不要代码围栏）:
 {
   "direction": "up" | "down" | "flat",
+  "up_probability": 0.0 to 1.0,
+  "down_probability": 0.0 to 1.0,
+  "flat_probability": 0.0 to 1.0,
   "confidence": 0.0 to 1.0,
   "rational_price": <必须填写具体数字>,
   "reasoning": "<用简体中文写2-3句精炼分析，必须包含具体价格水平>"
-}"""
+}
+
+注意: up_probability + down_probability + flat_probability 应该等于1.0。
+confidence应等于direction对应方向的概率值。
+例如direction为"up"时，confidence应等于up_probability。"""
 
 # ── Market-type-specific prompt context ──────────────────────────
 MARKET_TYPE_CONTEXT = {
@@ -220,6 +227,36 @@ def _parse_vote(raw: dict, model_name: str) -> ModelVote:
     confidence = float(raw.get("confidence", 0.3))
     confidence = max(0.0, min(1.0, confidence))
 
+    # Parse probabilities (R13 ensemble approach)
+    up_prob = _safe_float(raw.get("up_probability"))
+    down_prob = _safe_float(raw.get("down_probability"))
+    flat_prob = _safe_float(raw.get("flat_probability"))
+
+    # If probabilities are provided, normalize them to sum to 1.0
+    if up_prob is not None and down_prob is not None and flat_prob is not None:
+        total = up_prob + down_prob + flat_prob
+        if total > 0:
+            up_prob = up_prob / total
+            down_prob = down_prob / total
+            flat_prob = flat_prob / total
+    elif up_prob is None and down_prob is None and flat_prob is None:
+        # Derive from direction and confidence
+        if direction == Direction.UP:
+            up_prob = confidence
+            remaining = 1.0 - confidence
+            down_prob = remaining * 0.6
+            flat_prob = remaining * 0.4
+        elif direction == Direction.DOWN:
+            down_prob = confidence
+            remaining = 1.0 - confidence
+            up_prob = remaining * 0.6
+            flat_prob = remaining * 0.4
+        else:
+            flat_prob = confidence
+            remaining = 1.0 - confidence
+            up_prob = remaining * 0.5
+            down_prob = remaining * 0.5
+
     rational_price = raw.get("rational_price")
     if rational_price is not None:
         try:
@@ -229,13 +266,28 @@ def _parse_vote(raw: dict, model_name: str) -> ModelVote:
 
     reasoning = str(raw.get("reasoning", "No reasoning provided."))
 
-    return ModelVote(
+    vote = ModelVote(
         model_name=raw.get("_model", model_name),
         direction=direction,
         confidence=confidence,
         rational_price=rational_price,
         reasoning=reasoning,
     )
+    # Attach probabilities as extra attributes
+    vote.up_probability = up_prob  # type: ignore[attr-defined]
+    vote.down_probability = down_prob  # type: ignore[attr-defined]
+    vote.flat_probability = flat_prob  # type: ignore[attr-defined]
+    return vote
+
+
+def _safe_float(val) -> float | None:
+    """Safely convert a value to float, returning None on failure."""
+    if val is None:
+        return None
+    try:
+        return max(0.0, min(1.0, float(val)))
+    except (TypeError, ValueError):
+        return None
 
 
 def _compute_consensus(votes: list[ModelVote]) -> ConsensusResult:
@@ -291,7 +343,13 @@ def _compute_consensus(votes: list[ModelVote]) -> ConsensusResult:
     reasonings = [f"[{v.model_name}] {v.reasoning}" for v in votes]
     combined_reasoning = " | ".join(reasonings)
 
-    return ConsensusResult(
+    # Aggregate probabilities across all votes (R13)
+    n = len(votes)
+    avg_up = sum(getattr(v, 'up_probability', 0.0) or 0.0 for v in votes) / n
+    avg_down = sum(getattr(v, 'down_probability', 0.0) or 0.0 for v in votes) / n
+    avg_flat = sum(getattr(v, 'flat_probability', 0.0) or 0.0 for v in votes) / n
+
+    result = ConsensusResult(
         direction=majority_dir,
         confidence=conf,
         confidence_score=round(conf_score, 3),
@@ -299,6 +357,11 @@ def _compute_consensus(votes: list[ModelVote]) -> ConsensusResult:
         reasoning=combined_reasoning,
         model_votes=votes,
     )
+    # Attach aggregate probabilities
+    result.up_probability = round(avg_up, 3)  # type: ignore[attr-defined]
+    result.down_probability = round(avg_down, 3)  # type: ignore[attr-defined]
+    result.flat_probability = round(avg_flat, 3)  # type: ignore[attr-defined]
+    return result
 
 
 class AIConsensusPlugin(ReasoningPlugin):
@@ -355,6 +418,9 @@ class AIConsensusPlugin(ReasoningPlugin):
             "confidence_score": consensus.confidence_score,
             "rational_price": consensus.rational_price,
             "reasoning": consensus.reasoning,
+            "up_probability": getattr(consensus, 'up_probability', None),
+            "down_probability": getattr(consensus, 'down_probability', None),
+            "flat_probability": getattr(consensus, 'flat_probability', None),
             "model_votes": [
                 {
                     "model_name": v.model_name,
@@ -362,6 +428,9 @@ class AIConsensusPlugin(ReasoningPlugin):
                     "confidence": v.confidence,
                     "rational_price": v.rational_price,
                     "reasoning": v.reasoning,
+                    "up_probability": getattr(v, 'up_probability', None),
+                    "down_probability": getattr(v, 'down_probability', None),
+                    "flat_probability": getattr(v, 'flat_probability', None),
                 }
                 for v in consensus.model_votes
             ],

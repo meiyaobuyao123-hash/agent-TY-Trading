@@ -167,23 +167,7 @@ class MarketDetailPage extends ConsumerWidget {
                   ),
                 ),
 
-                // ── Price chart section ──
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                    child: _buildPriceChartSection(ref),
-                  ),
-                ),
-
-                // ── Related markets section ──
-                SliverToBoxAdapter(
-                  child: Padding(
-                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                    child: _buildRelatedMarketsSection(ref),
-                  ),
-                ),
-
-                // ── AI Analysis section ──
+                // ── Section 1: AI最新判断 — direction + confidence + bias ──
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
@@ -239,13 +223,41 @@ class MarketDetailPage extends ConsumerWidget {
                             // Market accuracy stat
                             _buildMarketAccuracy(judgments),
                             const SizedBox(height: 20),
-                            // AI analysis header + card
+                            // Section 1: AI最新判断
                             _buildAIAnalysisSection(context, judgments.first),
-                            const SizedBox(height: 32),
-                            // Judgment history
-                            _buildHistorySection(context, judgments),
                           ],
                         );
+                      },
+                    ),
+                  ),
+                ),
+
+                // ── Section 3: 价格走势 — chart ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: _buildPriceChartSection(ref),
+                  ),
+                ),
+
+                // ── Section 4: 相关市场 — horizontal scroll ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: _buildRelatedMarketsSection(ref),
+                  ),
+                ),
+
+                // ── Section 5: 历史判断 — timeline ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: judgmentsAsync.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
+                      data: (judgments) {
+                        if (judgments.isEmpty) return const SizedBox.shrink();
+                        return _buildHistorySection(context, judgments);
                       },
                     ),
                   ),

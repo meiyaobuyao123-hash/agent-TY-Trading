@@ -62,4 +62,10 @@ class AccuracyRepository {
     final response = await _dio.get('/stats/genome-status');
     return response.data as Map<String, dynamic>;
   }
+
+  /// Fetch overview stats (includes Brier score, R13).
+  Future<Map<String, dynamic>> fetchOverviewStats() async {
+    final response = await _dio.get('/stats/overview');
+    return response.data as Map<String, dynamic>;
+  }
 }
