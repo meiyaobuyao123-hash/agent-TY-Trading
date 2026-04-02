@@ -17,6 +17,7 @@ class SettingsPage extends ConsumerStatefulWidget {
 class _SettingsPageState extends ConsumerState<SettingsPage> {
   bool _triggering = false;
   String? _triggerResult;
+  int _triggerMarketCount = 0;
 
   // Health data
   bool _serverOnline = false;
@@ -123,22 +124,39 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     setState(() {
       _triggering = true;
       _triggerResult = null;
+      _triggerMarketCount = 0;
     });
 
     try {
       final dio = ref.read(dioProvider);
+
+      // 先获取活跃市场数量，用于显示进度
+      try {
+        final marketsResp = await dio.get('/stats/overview');
+        setState(() {
+          _triggerMarketCount =
+              marketsResp.data['markets_tracked'] as int? ?? 0;
+        });
+      } catch (_) {
+        // 忽略，使用默认值
+      }
+
       final response = await dio.post(
         '/judgments/trigger',
         data: {'horizon_hours': 4},
-        options: Options(headers: {'X-API-Key': 'ty-2026-secret-key'}),
+        options: Options(
+          headers: {'X-API-Key': 'ty-2026-secret-key'},
+          receiveTimeout: const Duration(minutes: 10),
+        ),
       );
       final triggered = response.data['triggered'] ?? 0;
       setState(() {
-        _triggerResult = '成功触发 $triggered 个判断';
+        _triggerResult = '完成: 成功分析 $triggered 个市场';
       });
     } on DioException catch (e) {
+      final msg = e.response?.data?['detail'] ?? e.message ?? '未知错误';
       setState(() {
-        _triggerResult = '失败: ${e.message}';
+        _triggerResult = '失败: $msg';
       });
     } finally {
       setState(() {
@@ -317,13 +335,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 iconColor: AppTheme.primary,
                 title: '触发AI判断',
                 value: _triggering
-                    ? '触发中...'
+                    ? (_triggerMarketCount > 0
+                        ? '正在分析$_triggerMarketCount个市场...'
+                        : '准备中...')
                     : (_triggerResult ?? '手动执行一次判断周期'),
                 valueColor: _triggerResult != null
                     ? (_triggerResult!.startsWith('失败')
                         ? AppTheme.downRed
                         : AppTheme.upGreen)
-                    : null,
+                    : _triggering
+                        ? AppTheme.primary
+                        : null,
                 trailing: _triggering
                     ? const SizedBox(
                         width: 18,

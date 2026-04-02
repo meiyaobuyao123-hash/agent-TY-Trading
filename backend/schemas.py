@@ -46,6 +46,8 @@ class MarketOut(BaseModel):
     is_active: bool
     created_at: datetime
     latest_snapshot: Optional[MarketSnapshotOut] = None
+    data_age_seconds: Optional[int] = None  # 数据新鲜度（秒），None表示无数据
+    data_age_label: Optional[str] = None  # 人类可读的数据年龄，如"2分钟前"
 
     model_config = {"from_attributes": True}
 

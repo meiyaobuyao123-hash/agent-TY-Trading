@@ -563,14 +563,32 @@ class _MarketRow extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 2),
-                      Text(
-                        market.name,
-                        style: const TextStyle(
-                          color: AppTheme.textSecondary,
-                          fontSize: 13,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
+                      Row(
+                        children: [
+                          Flexible(
+                            child: Text(
+                              market.name,
+                              style: const TextStyle(
+                                color: AppTheme.textSecondary,
+                                fontSize: 13,
+                              ),
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                          if (market.dataAgeLabel != null) ...[
+                            const SizedBox(width: 6),
+                            Text(
+                              market.dataAgeLabel!,
+                              style: TextStyle(
+                                color: (market.dataAgeSeconds ?? 0) > 86400
+                                    ? AppTheme.downRed.withValues(alpha: 0.7)
+                                    : AppTheme.textSecondary.withValues(alpha: 0.6),
+                                fontSize: 11,
+                              ),
+                            ),
+                          ],
+                        ],
                       ),
                     ],
                   ),

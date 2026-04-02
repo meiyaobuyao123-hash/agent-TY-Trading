@@ -10,6 +10,8 @@ class Market {
   final bool isActive;
   final DateTime createdAt;
   final MarketSnapshot? latestSnapshot;
+  final int? dataAgeSeconds;
+  final String? dataAgeLabel;
 
   const Market({
     required this.id,
@@ -20,6 +22,8 @@ class Market {
     required this.isActive,
     required this.createdAt,
     this.latestSnapshot,
+    this.dataAgeSeconds,
+    this.dataAgeLabel,
   });
 
   factory Market.fromJson(Map<String, dynamic> json) {
@@ -35,6 +39,8 @@ class Market {
           ? MarketSnapshot.fromJson(
               json['latest_snapshot'] as Map<String, dynamic>)
           : null,
+      dataAgeSeconds: json['data_age_seconds'] as int?,
+      dataAgeLabel: json['data_age_label'] as String?,
     );
   }
 

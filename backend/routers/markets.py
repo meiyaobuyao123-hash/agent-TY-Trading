@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import uuid
-from datetime import datetime
+from datetime import datetime, timezone
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,6 +16,27 @@ from backend.models import Market, MarketSnapshot
 from backend.schemas import MarketCreate, MarketOut, MarketSnapshotOut
 
 router = APIRouter(prefix="/markets", tags=["markets"])
+
+
+def _compute_data_age(captured_at: Optional[datetime]) -> tuple[Optional[int], Optional[str]]:
+    """计算数据新鲜度，返回 (秒数, 人类可读标签)。"""
+    if captured_at is None:
+        return None, "无数据"
+    now = datetime.utcnow()
+    delta = now - captured_at
+    seconds = int(delta.total_seconds())
+    if seconds < 0:
+        seconds = 0
+
+    if seconds < 60:
+        label = f"{seconds}秒前"
+    elif seconds < 3600:
+        label = f"{seconds // 60}分钟前"
+    elif seconds < 86400:
+        label = f"{seconds // 3600}小时前"
+    else:
+        label = f"{seconds // 86400}天前"
+    return seconds, label
 
 
 @router.get("", response_model=list[MarketOut])
@@ -65,6 +86,7 @@ async def list_markets(
     for m in markets:
         snap = snap_map.get(m.id)
         latest = None
+        captured_at = None
         if snap:
             latest = MarketSnapshotOut(
                 id=snap.id,
@@ -73,6 +95,9 @@ async def list_markets(
                 change_pct=snap.change_pct,
                 captured_at=snap.captured_at,
             )
+            captured_at = snap.captured_at
+
+        data_age_seconds, data_age_label = _compute_data_age(captured_at)
 
         out.append(
             MarketOut(
@@ -84,6 +109,8 @@ async def list_markets(
                 is_active=m.is_active,
                 created_at=m.created_at,
                 latest_snapshot=latest,
+                data_age_seconds=data_age_seconds,
+                data_age_label=data_age_label,
             )
         )
     return out
@@ -111,6 +138,7 @@ async def get_market(
     snap = snap_result.scalar_one_or_none()
 
     latest = None
+    captured_at = None
     if snap:
         latest = MarketSnapshotOut(
             id=snap.id,
@@ -119,6 +147,9 @@ async def get_market(
             change_pct=snap.change_pct,
             captured_at=snap.captured_at,
         )
+        captured_at = snap.captured_at
+
+    data_age_seconds, data_age_label = _compute_data_age(captured_at)
 
     return MarketOut(
         id=market.id,
@@ -129,6 +160,8 @@ async def get_market(
         is_active=market.is_active,
         created_at=market.created_at,
         latest_snapshot=latest,
+        data_age_seconds=data_age_seconds,
+        data_age_label=data_age_label,
     )
 
 
@@ -296,4 +329,6 @@ async def create_market(
         source=market.source,
         is_active=market.is_active,
         created_at=market.created_at,
+        data_age_seconds=None,
+        data_age_label="无数据",
     )
