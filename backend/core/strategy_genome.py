@@ -266,6 +266,42 @@ async def evolve_genomes(session: AsyncSession) -> Optional[str]:
         "基因组进化: %s 变异 (代数 %d -> %d)",
         worst.name, worst.generation, worst.generation + 1,
     )
+
+    # ── Adaptive horizon: evaluate and adjust horizons per market type ──
+    try:
+        from backend.core.meta_learner import analyze_success_patterns
+        meta = await analyze_success_patterns(session)
+        by_horizon = meta.get("by_horizon", {})
+        from backend.services.judgment_service import HORIZON_MAP
+
+        horizon_adjustments = []
+        for mt, horizons in by_horizon.items():
+            qualified_h = [
+                (int(h), v) for h, v in horizons.items()
+                if v["total"] >= 5
+            ]
+            if len(qualified_h) < 2:
+                continue
+            best_h = max(qualified_h, key=lambda x: x[1]["accuracy_pct"])
+            current_h = HORIZON_MAP.get(mt)
+            if current_h and best_h[0] != current_h and best_h[1]["accuracy_pct"] > 55:
+                # Check if significantly better (>10% gap)
+                current_acc = next(
+                    (v["accuracy_pct"] for h, v in qualified_h if h == current_h),
+                    0,
+                )
+                if best_h[1]["accuracy_pct"] - current_acc > 10:
+                    HORIZON_MAP[mt] = best_h[0]
+                    horizon_adjustments.append(
+                        f"{mt}: {current_h}h -> {best_h[0]}h "
+                        f"(准确率 {current_acc}% -> {best_h[1]['accuracy_pct']}%)"
+                    )
+
+        if horizon_adjustments:
+            logger.info("自适应预测周期调整: %s", "; ".join(horizon_adjustments))
+    except Exception:
+        logger.debug("Adaptive horizon evaluation skipped")
+
     return worst.name
 
 

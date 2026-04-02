@@ -938,3 +938,28 @@ async def get_discoveries(
     discoveries.sort(key=lambda d: (severity_order.get(d.severity, 9), type_order.get(d.type, 9)))
 
     return discoveries[:5]
+
+
+# ── Meta-Learning Insights (L4) ─────────────────────────────────────
+
+
+class MetaInsightsResponse(BaseModel):
+    by_regime: dict = {}
+    by_confidence_bucket: dict = {}
+    by_volatility: dict = {}
+    by_time_gap: dict = {}
+    by_horizon: dict = {}
+    meta_insight_text: str = ""
+    recommendations: list[str] = []
+    total_analyzed: int = 0
+
+
+@router.get("/meta-insights", response_model=MetaInsightsResponse)
+async def get_meta_insights(
+    session: AsyncSession = Depends(get_session),
+) -> MetaInsightsResponse:
+    """Return meta-learning insights — patterns in what makes predictions correct vs wrong."""
+    from backend.core.meta_learner import analyze_success_patterns
+
+    result = await analyze_success_patterns(session)
+    return MetaInsightsResponse(**result)

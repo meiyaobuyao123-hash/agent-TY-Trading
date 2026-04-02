@@ -485,11 +485,17 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
         ref.invalidate(genomeStatusProvider);
         ref.invalidate(accuracyByHourProvider);
         ref.invalidate(biasReportProvider);
+        ref.invalidate(metaInsightsProvider);
         await ref.read(genomeStatusProvider.future);
       },
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         children: [
+          // Meta-learning self-awareness section (L4)
+          _MetaInsightsSection(),
+
+          const SizedBox(height: 24),
+
           // Strategy genome section
           _GenomeStatusSection(),
 
@@ -1736,6 +1742,214 @@ class _AccuracyByHourSection extends ConsumerWidget {
 }
 
 /// Strategy Genome Status section.
+class _MetaInsightsSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metaAsync = ref.watch(metaInsightsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF9C27B0).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: const Icon(Icons.psychology_rounded,
+                    size: 16, color: Color(0xFF9C27B0)),
+              ),
+              const SizedBox(width: 10),
+              const Expanded(
+                child: Text(
+                  'AI自我认知',
+                  style: TextStyle(
+                    fontSize: 15,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimary,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          metaAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: SizedBox(
+                  width: 20, height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (_, __) => const Text(
+              '暂无元学习数据',
+              style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+            ),
+            data: (data) => _buildMetaContent(data),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildMetaContent(Map<String, dynamic> data) {
+    final insightText = data['meta_insight_text'] as String? ?? '';
+    final recommendations = (data['recommendations'] as List<dynamic>?) ?? [];
+    final totalAnalyzed = data['total_analyzed'] as int? ?? 0;
+    final byRegime = (data['by_regime'] as Map<String, dynamic>?) ?? {};
+
+    if (totalAnalyzed == 0) {
+      return const Text(
+        '暂无已结算判断，元学习需要更多数据。',
+        style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Meta insight summary
+        Container(
+          width: double.infinity,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: const Color(0xFF9C27B0).withValues(alpha: 0.06),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            insightText,
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textPrimary,
+              height: 1.5,
+            ),
+          ),
+        ),
+
+        // Regime accuracy table
+        if (byRegime.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          const Text(
+            '各市场状态准确率',
+            style: TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+            ),
+          ),
+          const SizedBox(height: 8),
+          ...byRegime.entries.map((e) {
+            final regimeData = e.value as Map<String, dynamic>;
+            final total = regimeData['total'] as int? ?? 0;
+            final acc = (regimeData['accuracy_pct'] as num?)?.toDouble() ?? 0;
+            if (total < 2) return const SizedBox.shrink();
+            final barWidth = (acc / 100).clamp(0.0, 1.0);
+            final barColor = acc >= 60
+                ? const Color(0xFF22C55E)
+                : acc >= 40
+                    ? const Color(0xFFF59E0B)
+                    : const Color(0xFFEF4444);
+            return Padding(
+              padding: const EdgeInsets.only(bottom: 6),
+              child: Row(
+                children: [
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      e.key,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                  Expanded(
+                    child: Container(
+                      height: 14,
+                      decoration: BoxDecoration(
+                        color: AppTheme.divider.withValues(alpha: 0.3),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: FractionallySizedBox(
+                        alignment: Alignment.centerLeft,
+                        widthFactor: barWidth,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: barColor,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  SizedBox(
+                    width: 60,
+                    child: Text(
+                      '${acc.toStringAsFixed(1)}% ($total)',
+                      style: const TextStyle(
+                        fontSize: 11,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            );
+          }),
+        ],
+
+        // Recommendations
+        if (recommendations.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          ...recommendations.map((r) => Padding(
+                padding: const EdgeInsets.only(bottom: 4),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Icon(Icons.lightbulb_outline_rounded,
+                        size: 14, color: Color(0xFFF59E0B)),
+                    const SizedBox(width: 6),
+                    Expanded(
+                      child: Text(
+                        r.toString(),
+                        style: const TextStyle(
+                          fontSize: 12,
+                          color: AppTheme.textSecondary,
+                          height: 1.4,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              )),
+        ],
+
+        // Total analyzed count
+        const SizedBox(height: 8),
+        Text(
+          '基于 $totalAnalyzed 个已结算判断的分析',
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppTheme.flatGray,
+          ),
+        ),
+      ],
+    );
+  }
+}
+
 class _GenomeStatusSection extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {

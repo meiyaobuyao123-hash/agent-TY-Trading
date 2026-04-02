@@ -68,4 +68,10 @@ class AccuracyRepository {
     final response = await _dio.get('/stats/overview');
     return response.data as Map<String, dynamic>;
   }
+
+  /// Fetch meta-learning insights (L4).
+  Future<Map<String, dynamic>> fetchMetaInsights() async {
+    final response = await _dio.get('/stats/meta-insights');
+    return response.data as Map<String, dynamic>;
+  }
 }

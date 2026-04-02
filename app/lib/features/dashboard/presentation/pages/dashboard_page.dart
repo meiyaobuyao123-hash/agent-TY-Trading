@@ -134,7 +134,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ),
             ),
 
-          // Dashboard info text
+          // Dashboard info text + milestone badge
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Container(
@@ -150,12 +150,40 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'AI每4小时分析全球195个市场，给出方向判断和合理价格估值',
+                      'AI每4小时分析全球250+市场，给出方向判断和合理价格估值',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
                         height: 1.4,
                       ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // Milestone badge
+          Padding(
+            padding: const EdgeInsets.only(top: 6),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+              decoration: BoxDecoration(
+                gradient: const LinearGradient(
+                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+                ),
+                borderRadius: BorderRadius.circular(6),
+              ),
+              child: const Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('\u{1F3AF}', style: TextStyle(fontSize: 12)),
+                  SizedBox(width: 4),
+                  Text(
+                    '\u5df2\u8986\u76d6250+\u5168\u7403\u5e02\u573a',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: Colors.white,
+                      fontWeight: FontWeight.w600,
                     ),
                   ),
                 ],

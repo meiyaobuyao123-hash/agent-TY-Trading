@@ -62,3 +62,10 @@ final overviewStatsForEvolutionProvider =
   final repo = ref.watch(accuracyRepositoryProvider);
   return repo.fetchOverviewStats();
 });
+
+/// Provides meta-learning insights (L4).
+final metaInsightsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchMetaInsights();
+});

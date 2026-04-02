@@ -87,6 +87,29 @@ STOOQ_MAP = {
     "VALE": "vale.us", "ITUB": "itub.us", "BBD": "bbd.us",
     # R18 — Middle East / Africa
     "2222.SR": "2222.sr", "GFI": "gfi.us",
+    # R19 — More US tech
+    "SNAP": "snap.us", "PINS": "pins.us", "RBLX": "rblx.us", "U": "u.us",
+    "ROKU": "roku.us", "DOCU": "docu.us", "TWLO": "twlo.us", "OKTA": "okta.us",
+    "BILL": "bill.us",
+    # R19 — US healthcare
+    "ISRG": "isrg.us", "DXCM": "dxcm.us", "VEEV": "veev.us", "ZTS": "zts.us",
+    "REGN": "regn.us", "VRTX": "vrtx.us", "BIIB": "biib.us",
+    # R19 — US industrials
+    "CAT": "cat.us", "DE": "de.us", "HON": "hon.us", "GE": "ge.us",
+    "RTX": "rtx.us", "LMT": "lmt.us", "BA": "ba.us",
+    # R19 — US REITs
+    "AMT": "amt.us", "PLD": "pld.us", "EQIX": "eqix.us", "SPG": "spg.us",
+    "O": "o.us",
+    # R19 — US semiconductors
+    "MRVL": "mrvl.us", "ON": "on.us", "KLAC": "klac.us",
+    "LRCX": "lrcx.us", "AMAT": "amat.us",
+    # R19 — US media/telecom
+    "CMCSA": "cmcsa.us", "T": "t.us", "VZ": "vz.us", "TMUS": "tmus.us",
+    # R19 — US consumer
+    "TGT": "tgt.us", "LOW": "low.us", "LULU": "lulu.us", "EL": "el.us",
+    # R19 — US fintech/insurance
+    "FIS": "fis.us", "FISV": "fisv.us", "PGR": "pgr.us",
+    "ALL": "all.us", "TRV": "trv.us",
 }
 
 # yfinance symbol map (fallback)
@@ -143,6 +166,29 @@ YFINANCE_MAP = {
     "VALE": "VALE", "ITUB": "ITUB", "BBD": "BBD",
     # R18 — Middle East / Africa
     "2222.SR": "2222.SR", "GFI": "GFI",
+    # R19 — More US tech
+    "SNAP": "SNAP", "PINS": "PINS", "RBLX": "RBLX", "U": "U",
+    "ROKU": "ROKU", "DOCU": "DOCU", "TWLO": "TWLO", "OKTA": "OKTA",
+    "BILL": "BILL",
+    # R19 — US healthcare
+    "ISRG": "ISRG", "DXCM": "DXCM", "VEEV": "VEEV", "ZTS": "ZTS",
+    "REGN": "REGN", "VRTX": "VRTX", "BIIB": "BIIB",
+    # R19 — US industrials
+    "CAT": "CAT", "DE": "DE", "HON": "HON", "GE": "GE",
+    "RTX": "RTX", "LMT": "LMT", "BA": "BA",
+    # R19 — US REITs
+    "AMT": "AMT", "PLD": "PLD", "EQIX": "EQIX", "SPG": "SPG",
+    "O": "O",
+    # R19 — US semiconductors
+    "MRVL": "MRVL", "ON": "ON", "KLAC": "KLAC",
+    "LRCX": "LRCX", "AMAT": "AMAT",
+    # R19 — US media/telecom
+    "CMCSA": "CMCSA", "T": "T", "VZ": "VZ", "TMUS": "TMUS",
+    # R19 — US consumer
+    "TGT": "TGT", "LOW": "LOW", "LULU": "LULU", "EL": "EL",
+    # R19 — US fintech/insurance
+    "FIS": "FIS", "FISV": "FISV", "PGR": "PGR",
+    "ALL": "ALL", "TRV": "TRV",
 }
 
 # Market type classification
@@ -157,6 +203,15 @@ US_STOCKS = {
     "SLB", "EOG", "OXY",
     "SBUX", "NKE", "MCD", "KO", "PEP",
     "BRK-B", "C", "WFC", "AXP", "BLK", "SCHW",
+    # R19 expansion
+    "SNAP", "PINS", "RBLX", "U", "ROKU", "DOCU", "TWLO", "OKTA", "BILL",
+    "ISRG", "DXCM", "VEEV", "ZTS", "REGN", "VRTX", "BIIB",
+    "CAT", "DE", "HON", "GE", "RTX", "LMT", "BA",
+    "AMT", "PLD", "EQIX", "SPG", "O",
+    "MRVL", "ON", "KLAC", "LRCX", "AMAT",
+    "CMCSA", "T", "VZ", "TMUS",
+    "TGT", "LOW", "LULU", "EL",
+    "FIS", "FISV", "PGR", "ALL", "TRV",
 }
 ETFS = {
     "SPY", "QQQ", "IWM", "DIA", "GLD", "SLV", "USO", "TLT",

@@ -24,6 +24,7 @@ from backend.core.macro_calendar import format_macro_events_for_prompt
 from backend.core.market_regime import detect_regime, format_regime_for_prompt, regime_to_dict
 from backend.models import Judgment, Market, MarketSnapshot, Settlement, AccuracyStat
 from backend.core.strategy_genome import get_best_genome, build_genome_prompt_hint
+from backend.core.meta_learner import analyze_success_patterns, build_meta_insight_prompt
 from backend.plugins.bias_detectors.deviation_calc import calculate_deviation_pct
 from backend.plugins.bias_detectors.cognitive_bias import detect_all_biases
 from backend.plugins.data_sources.fear_greed import get_fear_greed_index
@@ -380,6 +381,7 @@ async def _process_single_market(
     reasoning,
     horizon_hours: int,
     tick_cache: dict,
+    meta_insight_hint: str = "",
 ) -> Optional[Judgment]:
     """Process a single market: fetch data, call AI, record judgment."""
     try:
@@ -549,6 +551,7 @@ async def _process_single_market(
             "propagation_text": propagation_text,
             "macro_text": macro_text,
             "regime_text": regime_text,
+            "meta_insight_hint": meta_insight_hint,
         }
         ai_result = await reasoning.analyze(context)
 
@@ -712,6 +715,16 @@ async def trigger_judgment_cycle(
         ds_name = DATA_SOURCE_MAP.get(market.market_type, "binance-rest")
         source_groups[ds_name].append(market)
 
+    # Pre-compute meta-learning insights once for the entire cycle
+    meta_insight_hint = ""
+    try:
+        meta_data = await analyze_success_patterns(session)
+        meta_insight_hint = build_meta_insight_prompt(meta_data)
+        if meta_insight_hint:
+            logger.info("元学习洞察已加载: %d个已分析判断", meta_data.get("total_analyzed", 0))
+    except Exception:
+        logger.debug("Failed to load meta-learning insights")
+
     tick_cache: dict[str, dict] = {}
     data_source_errors: dict[str, str] = {}
 
@@ -776,7 +789,8 @@ async def trigger_judgment_cycle(
 
         try:
             j = await _process_single_market(
-                market, plugin_manager, session, reasoning, horizon_hours, tick_cache
+                market, plugin_manager, session, reasoning, horizon_hours, tick_cache,
+                meta_insight_hint=meta_insight_hint,
             )
             if j:
                 judgments.append(j)

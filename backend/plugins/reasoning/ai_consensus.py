@@ -189,6 +189,7 @@ def _build_prompt(
     propagation_text: str = "",
     macro_text: str = "",
     regime_text: str = "",
+    meta_insight_hint: str = "",
 ) -> str:
     """Build the prompt for AI models given market data."""
     price = market_data.get("price", "N/A")
@@ -273,6 +274,9 @@ def _build_prompt(
     # Strategy genome section (L4 self-evolution)
     genome_section = f"\n\n{genome_hint}" if genome_hint else ""
 
+    # Meta-learning section (L4 self-awareness)
+    meta_section_prompt = f"\n\n{meta_insight_hint}" if meta_insight_hint else ""
+
     return f"""分析以下市场并预测未来 {horizon_label} 的方向。
 
 品种: {symbol}
@@ -280,7 +284,7 @@ def _build_prompt(
 当前价格: {price}
 24小时涨跌幅: {change}%
 24小时成交量: {volume}
-预测周期: {horizon_label}{type_section}{tech_section}{regime_section}{mcap_section}{history_section}{fear_greed_section}{breadth_section}{cross_market_section}{propagation_section}{macro_section}{evolution_section}{genome_section}
+预测周期: {horizon_label}{type_section}{tech_section}{regime_section}{mcap_section}{history_section}{fear_greed_section}{breadth_section}{cross_market_section}{propagation_section}{macro_section}{evolution_section}{genome_section}{meta_section_prompt}
 
 请给出方向判断(up/down/flat)、置信度(0-1)、合理价格目标，以及简体中文的精炼分析。
 提醒: 如果技术指标未显示极端信号，且24h涨跌幅在噪声范围内，flat是合理选择。"""
@@ -472,12 +476,14 @@ class AIConsensusPlugin(ReasoningPlugin):
         propagation_text = context.get("propagation_text", "")
         macro_text = context.get("macro_text", "")
         regime_text = context.get("regime_text", "")
+        meta_insight_hint = context.get("meta_insight_hint", "")
 
         prompt = _build_prompt(
             symbol, market_data, horizon_hours, history_text,
             last_judgment, market_context, fear_greed, market_breadth,
             genome_hint, tech_indicators_text, mcap_text,
             propagation_text, macro_text, regime_text,
+            meta_insight_hint,
         )
         raw_results = await call_all_models(prompt, system=SYSTEM_PROMPT)
 
