@@ -74,4 +74,11 @@ class AccuracyRepository {
     final response = await _dio.get('/stats/meta-insights');
     return response.data as Map<String, dynamic>;
   }
+
+  /// Fetch evolution timeline milestones.
+  Future<List<Map<String, dynamic>>> fetchEvolutionTimeline() async {
+    final response = await _dio.get('/stats/evolution-timeline');
+    final data = response.data as List<dynamic>;
+    return data.cast<Map<String, dynamic>>();
+  }
 }

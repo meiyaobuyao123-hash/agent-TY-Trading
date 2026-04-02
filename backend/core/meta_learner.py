@@ -283,6 +283,78 @@ def build_meta_insight_prompt(meta_insights: dict) -> str:
     return "\n".join(parts)
 
 
+async def compute_learning_rates(session: AsyncSession) -> list[dict]:
+    """计算每种市场类型的AI学习速率。
+
+    比较前半段和后半段的准确率，判断AI是否在学习进步。
+    返回每种市场类型的学习率信息。
+    """
+    stmt = (
+        select(Judgment, Settlement, Market)
+        .join(Settlement, Settlement.judgment_id == Judgment.id)
+        .join(Market, Market.id == Judgment.market_id)
+        .where(Settlement.is_correct.isnot(None))
+        .order_by(Judgment.created_at)
+    )
+    result = await session.execute(stmt)
+    rows = result.all()
+
+    if not rows:
+        return []
+
+    # Group by market_type
+    type_judgments: dict[str, list] = defaultdict(list)
+    for j, s, m in rows:
+        type_judgments[m.market_type].append((j, s))
+
+    learning_rates = []
+    for market_type, jlist in type_judgments.items():
+        if len(jlist) < 6:
+            learning_rates.append({
+                "market_type": market_type,
+                "total": len(jlist),
+                "first_half_accuracy": 0.0,
+                "second_half_accuracy": 0.0,
+                "learning_rate": 0.0,
+                "status": "数据不足",
+                "label": "AI需要更多数据",
+            })
+            continue
+
+        mid = len(jlist) // 2
+        first_half = jlist[:mid]
+        second_half = jlist[mid:]
+
+        first_correct = sum(1 for _, s in first_half if s.is_correct)
+        second_correct = sum(1 for _, s in second_half if s.is_correct)
+        first_acc = first_correct / len(first_half) * 100
+        second_acc = second_correct / len(second_half) * 100
+        rate = second_acc - first_acc
+
+        if rate > 5:
+            status = "improving"
+            label = "AI正在学习"
+        elif rate < -5:
+            status = "declining"
+            label = "AI需要更多数据"
+        else:
+            status = "stable"
+            label = "AI表现稳定"
+
+        learning_rates.append({
+            "market_type": market_type,
+            "total": len(jlist),
+            "first_half_accuracy": round(first_acc, 1),
+            "second_half_accuracy": round(second_acc, 1),
+            "learning_rate": round(rate, 1),
+            "status": status,
+            "label": label,
+        })
+
+    learning_rates.sort(key=lambda x: x["learning_rate"], reverse=True)
+    return learning_rates
+
+
 async def get_optimal_horizon(session: AsyncSession, market_type: str) -> Optional[int]:
     """Check if a different horizon performs better for this market type.
 

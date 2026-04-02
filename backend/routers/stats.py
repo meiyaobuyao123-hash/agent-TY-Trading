@@ -1015,6 +1015,16 @@ async def get_discoveries(
 # ── Meta-Learning Insights (L4) ─────────────────────────────────────
 
 
+class LearningRateItem(BaseModel):
+    market_type: str
+    total: int
+    first_half_accuracy: float
+    second_half_accuracy: float
+    learning_rate: float
+    status: str
+    label: str
+
+
 class MetaInsightsResponse(BaseModel):
     by_regime: dict = {}
     by_confidence_bucket: dict = {}
@@ -1024,6 +1034,7 @@ class MetaInsightsResponse(BaseModel):
     meta_insight_text: str = ""
     recommendations: list[str] = []
     total_analyzed: int = 0
+    learning_rates: list[LearningRateItem] = []
 
 
 @router.get("/meta-insights", response_model=MetaInsightsResponse)
@@ -1031,9 +1042,11 @@ async def get_meta_insights(
     session: AsyncSession = Depends(get_session),
 ) -> MetaInsightsResponse:
     """Return meta-learning insights — patterns in what makes predictions correct vs wrong."""
-    from backend.core.meta_learner import analyze_success_patterns
+    from backend.core.meta_learner import analyze_success_patterns, compute_learning_rates
 
     result = await analyze_success_patterns(session)
+    lr = await compute_learning_rates(session)
+    result["learning_rates"] = lr
     return MetaInsightsResponse(**result)
 
 
@@ -1166,6 +1179,13 @@ class RegimeAccuracy(BaseModel):
     accuracy_pct: float
 
 
+class MarketReportCard(BaseModel):
+    data_quality_score: int = 0       # 0-100
+    ai_confidence_score: int = 0      # 0-100
+    prediction_track_record: int = 0  # 0-100
+    overall_grade: str = "N/A"        # A/B/C/D/F
+
+
 class MarketStatsResponse(BaseModel):
     symbol: str
     total_judgments: int
@@ -1178,6 +1198,7 @@ class MarketStatsResponse(BaseModel):
     best_regime: Optional[str] = None
     best_regime_accuracy: Optional[float] = None
     regime_breakdown: list[RegimeAccuracy] = []
+    report_card: Optional[MarketReportCard] = None
 
 
 @router.get("/market-stats/{symbol}", response_model=MarketStatsResponse)
@@ -1267,6 +1288,62 @@ async def get_market_stats(
 
     regime_breakdown.sort(key=lambda r: r.accuracy_pct, reverse=True)
 
+    # ── Market Report Card ──
+    report_card = None
+    try:
+        # Data Quality Score (0-100): based on snapshot freshness + data completeness
+        data_quality = 0
+        latest_snap_stmt = (
+            select(MarketSnapshot)
+            .where(MarketSnapshot.market_id == market.id)
+            .order_by(desc(MarketSnapshot.captured_at))
+            .limit(1)
+        )
+        latest_snap_result = await session.execute(latest_snap_stmt)
+        latest_snap = latest_snap_result.scalar_one_or_none()
+
+        if latest_snap:
+            # Freshness: full marks if < 4h old, decays to 0 at 48h
+            hours_old = (datetime.utcnow() - latest_snap.captured_at).total_seconds() / 3600
+            freshness = max(0, min(50, int(50 * (1 - hours_old / 48))))
+            # Completeness: price/volume/change_pct present
+            completeness = 0
+            if latest_snap.price is not None:
+                completeness += 20
+            if latest_snap.volume is not None:
+                completeness += 15
+            if latest_snap.change_pct is not None:
+                completeness += 15
+            data_quality = min(100, freshness + completeness)
+
+        # AI Confidence Score (0-100): average confidence * 100
+        ai_confidence = min(100, int(round(avg_confidence * 100)))
+
+        # Prediction Track Record (0-100): accuracy mapped to 0-100
+        track_record = int(round(accuracy_pct)) if settled_judgments >= 3 else 50
+
+        # Overall Grade
+        composite = (data_quality * 0.25 + ai_confidence * 0.25 + track_record * 0.50)
+        if composite >= 80:
+            grade = "A"
+        elif composite >= 65:
+            grade = "B"
+        elif composite >= 50:
+            grade = "C"
+        elif composite >= 35:
+            grade = "D"
+        else:
+            grade = "F"
+
+        report_card = MarketReportCard(
+            data_quality_score=data_quality,
+            ai_confidence_score=ai_confidence,
+            prediction_track_record=track_record,
+            overall_grade=grade,
+        )
+    except Exception:
+        pass
+
     return MarketStatsResponse(
         symbol=symbol,
         total_judgments=total_judgments,
@@ -1279,6 +1356,7 @@ async def get_market_stats(
         best_regime=best_regime,
         best_regime_accuracy=best_regime_accuracy,
         regime_breakdown=regime_breakdown,
+        report_card=report_card,
     )
 
 
@@ -1423,6 +1501,271 @@ async def get_global_view(
         regions=regions,
         summary_text=summary_text,
     )
+
+
+# ── 宏观信号 (Cross-Market Momentum Scanner) ──────────────────────────
+
+
+class SectorRotationItem(BaseModel):
+    from_sector: str
+    to_sector: str
+    description: str
+
+
+class MacroSignalsResponse(BaseModel):
+    sector_rotations: list[SectorRotationItem] = []
+    risk_sentiment: str = "中性"        # "避险" | "冒险" | "中性"
+    risk_detail: str = ""
+    crypto_equity_correlation: str = "无数据"  # "正相关" | "负相关" | "无相关"
+    crypto_equity_detail: str = ""
+    signals: list[str] = []             # summary signal labels
+
+
+@router.get("/macro-signals", response_model=MacroSignalsResponse)
+async def get_macro_signals(
+    session: AsyncSession = Depends(get_session),
+) -> MacroSignalsResponse:
+    """宏观信号扫描 — 板块轮动、风险偏好、加密-股票相关性。"""
+    from backend.core.sectors import SECTORS
+
+    # Get latest snapshot per market
+    latest_snap_sub = (
+        select(
+            MarketSnapshot.market_id,
+            func.max(MarketSnapshot.captured_at).label("max_at"),
+        )
+        .group_by(MarketSnapshot.market_id)
+        .subquery()
+    )
+    snap_stmt = (
+        select(MarketSnapshot.change_pct, Market.symbol, Market.market_type)
+        .join(
+            latest_snap_sub,
+            and_(
+                MarketSnapshot.market_id == latest_snap_sub.c.market_id,
+                MarketSnapshot.captured_at == latest_snap_sub.c.max_at,
+            ),
+        )
+        .join(Market, Market.id == MarketSnapshot.market_id)
+        .where(Market.is_active == True, MarketSnapshot.change_pct.isnot(None))
+    )
+    snap_result = await session.execute(snap_stmt)
+    all_snaps = snap_result.all()
+
+    symbol_change: dict[str, float] = {}
+    type_changes: dict[str, list[float]] = {}
+    for change_pct, sym, mt in all_snaps:
+        symbol_change[sym] = change_pct
+        type_changes.setdefault(mt, []).append(change_pct)
+
+    signals: list[str] = []
+
+    # ── 1. Sector rotation ──
+    sector_rotations: list[SectorRotationItem] = []
+    sector_avg: dict[str, float] = {}
+    for sym, change in symbol_change.items():
+        sector = SECTORS.get(sym)
+        if sector:
+            sector_avg.setdefault(sector, [])
+            sector_avg[sector].append(change)  # type: ignore[arg-type]
+
+    sector_avgs_computed: dict[str, float] = {}
+    for sector, changes_list in sector_avg.items():
+        if changes_list:
+            sector_avgs_computed[sector] = sum(changes_list) / len(changes_list)
+
+    if sector_avgs_computed:
+        sorted_sectors = sorted(sector_avgs_computed.items(), key=lambda x: x[1])
+        if len(sorted_sectors) >= 2:
+            worst = sorted_sectors[0]
+            best = sorted_sectors[-1]
+            if best[1] > 0.5 and worst[1] < -0.5:
+                sector_rotations.append(SectorRotationItem(
+                    from_sector=worst[0],
+                    to_sector=best[0],
+                    description=f"资金从{worst[0]}({worst[1]:+.1f}%)流向{best[0]}({best[1]:+.1f}%)",
+                ))
+                signals.append(f"板块轮动: {worst[0]} -> {best[0]}")
+
+    # ── 2. Risk-on/Risk-off ──
+    safe_havens = ["GC=F", "GLD", "TLT", "SI=F"]  # gold, bonds
+    risky_assets_types = ["us-equities", "crypto"]
+    safe_changes = [symbol_change.get(s, 0.0) for s in safe_havens if s in symbol_change]
+    risky_changes = []
+    for mt in risky_assets_types:
+        risky_changes.extend(type_changes.get(mt, []))
+
+    avg_safe = sum(safe_changes) / len(safe_changes) if safe_changes else 0.0
+    avg_risky = sum(risky_changes) / len(risky_changes) if risky_changes else 0.0
+
+    if avg_safe > 0.5 and avg_risky < -0.5:
+        risk_sentiment = "避险"
+        risk_detail = f"避险资产上涨{avg_safe:+.1f}%，风险资产下跌{avg_risky:.1f}% — 市场转向防守"
+        signals.append("避险信号")
+    elif avg_safe < -0.5 and avg_risky > 0.5:
+        risk_sentiment = "冒险"
+        risk_detail = f"风险资产上涨{avg_risky:+.1f}%，避险资产下跌{avg_safe:.1f}% — 市场偏好风险"
+        signals.append("冒险信号")
+    else:
+        risk_sentiment = "中性"
+        risk_detail = "避险与风险资产走势无明显分化"
+
+    # ── 3. Crypto-equity correlation ──
+    crypto_changes = type_changes.get("crypto", [])
+    equity_changes = type_changes.get("us-equities", [])
+
+    avg_crypto = sum(crypto_changes) / len(crypto_changes) if crypto_changes else None
+    avg_equity = sum(equity_changes) / len(equity_changes) if equity_changes else None
+
+    if avg_crypto is not None and avg_equity is not None:
+        if (avg_crypto > 0.3 and avg_equity > 0.3) or (avg_crypto < -0.3 and avg_equity < -0.3):
+            crypto_equity_correlation = "正相关"
+            crypto_equity_detail = f"加密({avg_crypto:+.1f}%)与美股({avg_equity:+.1f}%)同向运动"
+            signals.append("加密-股票正相关")
+        elif (avg_crypto > 0.5 and avg_equity < -0.5) or (avg_crypto < -0.5 and avg_equity > 0.5):
+            crypto_equity_correlation = "负相关"
+            crypto_equity_detail = f"加密({avg_crypto:+.1f}%)与美股({avg_equity:+.1f}%)反向运动"
+            signals.append("加密-股票负相关")
+        else:
+            crypto_equity_correlation = "无相关"
+            crypto_equity_detail = f"加密({avg_crypto:+.1f}%)与美股({avg_equity:+.1f}%)无明显关联"
+    else:
+        crypto_equity_correlation = "无数据"
+        crypto_equity_detail = "加密或美股数据不足"
+
+    return MacroSignalsResponse(
+        sector_rotations=sector_rotations,
+        risk_sentiment=risk_sentiment,
+        risk_detail=risk_detail,
+        crypto_equity_correlation=crypto_equity_correlation,
+        crypto_equity_detail=crypto_equity_detail,
+        signals=signals,
+    )
+
+
+# ── 进化时间线 (Evolution Timeline) ─────────────────────────────────
+
+
+class TimelineMilestone(BaseModel):
+    day: int
+    label: str
+    detail: str
+    timestamp: Optional[str] = None
+
+
+@router.get("/evolution-timeline", response_model=list[TimelineMilestone])
+async def get_evolution_timeline(
+    session: AsyncSession = Depends(get_session),
+) -> list[TimelineMilestone]:
+    """返回AI进化时间线 — 关键里程碑事件。"""
+    milestones: list[TimelineMilestone] = []
+
+    # Find the earliest judgment time
+    earliest_result = await session.execute(select(func.min(Judgment.created_at)))
+    earliest = earliest_result.scalar()
+    if not earliest:
+        return []
+
+    now = datetime.utcnow()
+
+    # Milestone 1: system start
+    milestones.append(TimelineMilestone(
+        day=1,
+        label="系统启动",
+        detail="天演AI开始运行",
+        timestamp=earliest.isoformat(),
+    ))
+
+    # Count markets over time via judgments
+    # Get distinct market counts at various time points
+    day_counts = {}
+    for offset_hours in [0, 4, 8, 12, 24, 48, 72, 96, 120, 168, 336]:
+        cutoff = earliest + timedelta(hours=offset_hours)
+        if cutoff > now:
+            break
+        count_result = await session.execute(
+            select(func.count(func.distinct(Judgment.market_id)))
+            .where(Judgment.created_at <= cutoff)
+        )
+        count = count_result.scalar() or 0
+        day_num = offset_hours // 24 + 1
+        if count > 0 and count not in day_counts.values():
+            day_counts[offset_hours] = count
+
+    # Generate market expansion milestones
+    prev_count = 0
+    for offset_hours, count in sorted(day_counts.items()):
+        day_num = offset_hours // 24 + 1
+        if count >= 100 and prev_count < 100:
+            milestones.append(TimelineMilestone(
+                day=day_num,
+                label=f"扩展至{count}个市场",
+                detail="覆盖范围大幅扩大",
+            ))
+        elif count >= 300 and prev_count < 300:
+            milestones.append(TimelineMilestone(
+                day=day_num,
+                label=f"达到{count}个市场",
+                detail="全球市场全面覆盖",
+            ))
+        prev_count = count
+
+    # Total judgments milestones
+    total_j_result = await session.execute(select(func.count()).select_from(Judgment))
+    total_j = total_j_result.scalar() or 0
+    if total_j >= 100:
+        milestones.append(TimelineMilestone(
+            day=max(1, (now - earliest).days),
+            label=f"累计{total_j}次判断",
+            detail="数据积累持续增长",
+        ))
+
+    # Settlements / accuracy milestones
+    settled_result = await session.execute(
+        select(func.count()).select_from(Settlement).where(Settlement.is_correct.isnot(None))
+    )
+    settled = settled_result.scalar() or 0
+    if settled >= 10:
+        correct_result = await session.execute(
+            select(func.count()).select_from(Settlement).where(Settlement.is_correct == True)
+        )
+        correct = correct_result.scalar() or 0
+        acc = round(correct / settled * 100, 1) if settled > 0 else 0
+        milestones.append(TimelineMilestone(
+            day=max(1, (now - earliest).days),
+            label=f"准确率{acc}%",
+            detail=f"已验证{settled}个判断，{correct}个正确",
+        ))
+
+    # Brier score milestone
+    brier_result = await session.execute(
+        select(func.avg(Settlement.brier_score)).where(Settlement.brier_score.isnot(None))
+    )
+    avg_brier = brier_result.scalar()
+    if avg_brier is not None:
+        quality = "优秀" if avg_brier < 0.2 else "良好" if avg_brier < 0.3 else "待改善"
+        milestones.append(TimelineMilestone(
+            day=max(1, (now - earliest).days),
+            label=f"Brier {avg_brier:.2f}",
+            detail=f"概率校准质量: {quality}",
+        ))
+
+    # Bias detection milestone
+    bias_result = await session.execute(
+        select(func.count()).select_from(Judgment).where(Judgment.bias_flags.isnot(None))
+    )
+    bias_count = bias_result.scalar() or 0
+    if bias_count > 0:
+        milestones.append(TimelineMilestone(
+            day=max(1, min((now - earliest).days, 2)),
+            label="首次检测到认知偏差",
+            detail=f"累计{bias_count}次偏差干预",
+        ))
+
+    # Sort by day
+    milestones.sort(key=lambda m: m.day)
+
+    return milestones
 
 
 # ── 每日报告 (日报) ─────────────────────────────────────────────────────

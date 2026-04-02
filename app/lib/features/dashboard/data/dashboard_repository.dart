@@ -57,4 +57,10 @@ class DashboardRepository {
     final response = await _dio.get('/stats/daily-report');
     return response.data as Map<String, dynamic>;
   }
+
+  /// Fetch macro signals (宏观信号).
+  Future<Map<String, dynamic>> fetchMacroSignals() async {
+    final response = await _dio.get('/stats/macro-signals');
+    return response.data as Map<String, dynamic>;
+  }
 }

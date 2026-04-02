@@ -144,18 +144,26 @@ class MarketDetailPage extends ConsumerWidget {
                                   ],
                                 ),
                                 const SizedBox(height: 16),
-                                // Info pills row
-                                Wrap(
-                                  spacing: 8,
-                                  runSpacing: 8,
+                                // Info pills row + report card grade
+                                Row(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    _infoPill(market.marketType),
-                                    _infoPill(market.source),
-                                    _infoPill('$updateTime 更新',
-                                        icon: Icons.access_time_rounded),
-                                    if (market.isActive)
-                                      _infoPill('活跃',
-                                          color: AppTheme.upGreen),
+                                    Expanded(
+                                      child: Wrap(
+                                        spacing: 8,
+                                        runSpacing: 8,
+                                        children: [
+                                          _infoPill(market.marketType),
+                                          _infoPill(market.source),
+                                          _infoPill('$updateTime 更新',
+                                              icon: Icons.access_time_rounded),
+                                          if (market.isActive)
+                                            _infoPill('活跃',
+                                                color: AppTheme.upGreen),
+                                        ],
+                                      ),
+                                    ),
+                                    _buildGradeBadge(ref),
                                   ],
                                 ),
                               ],
@@ -1239,6 +1247,47 @@ class MarketDetailPage extends ConsumerWidget {
           );
         }),
       ],
+    );
+  }
+
+  Widget _buildGradeBadge(WidgetRef ref) {
+    final statsAsync = ref.watch(marketStatsProvider(symbol));
+    return statsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (stats) {
+        final reportCard = stats['report_card'] as Map<String, dynamic>?;
+        if (reportCard == null) return const SizedBox.shrink();
+        final grade = reportCard['overall_grade'] as String? ?? 'N/A';
+        final gradeColor = switch (grade) {
+          'A' => AppTheme.upGreen,
+          'B' => const Color(0xFF4CAF50),
+          'C' => const Color(0xFFFFA726),
+          'D' => const Color(0xFFEF5350),
+          'F' => AppTheme.downRed,
+          _ => AppTheme.flatGray,
+        };
+        return Container(
+          width: 44,
+          height: 44,
+          decoration: BoxDecoration(
+            color: gradeColor.withValues(alpha: 0.12),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(color: gradeColor.withValues(alpha: 0.3)),
+          ),
+          child: Center(
+            child: Text(
+              grade,
+              style: TextStyle(
+                fontSize: 22,
+                fontWeight: FontWeight.w800,
+                color: gradeColor,
+                height: 1.0,
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 

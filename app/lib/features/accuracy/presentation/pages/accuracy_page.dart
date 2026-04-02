@@ -476,7 +476,7 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
   }
 
   // ═══════════════════════════════════════════════
-  // Tab 3: 进化 — Genome + heatmap + bias
+  // Tab 3: 进化 — Timeline + Learning Rate + Genome + heatmap + bias
   // ═══════════════════════════════════════════════
   Widget _buildEvolutionTab(WidgetRef ref) {
     return RefreshIndicator(
@@ -486,11 +486,22 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
         ref.invalidate(accuracyByHourProvider);
         ref.invalidate(biasReportProvider);
         ref.invalidate(metaInsightsProvider);
+        ref.invalidate(evolutionTimelineProvider);
         await ref.read(genomeStatusProvider.future);
       },
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
         children: [
+          // Evolution Timeline
+          _EvolutionTimelineSection(),
+
+          const SizedBox(height: 24),
+
+          // AI Learning Rate
+          _LearningRateSection(),
+
+          const SizedBox(height: 24),
+
           // Meta-learning self-awareness section (L4)
           _MetaInsightsSection(),
 
@@ -1219,6 +1230,272 @@ class _AccuracyTrendSection extends ConsumerWidget {
             ),
           ),
         ),
+      ),
+    );
+  }
+}
+
+/// Evolution Timeline section (进化时间线).
+class _EvolutionTimelineSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final timelineAsync = ref.watch(evolutionTimelineProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            '进化时间线',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 14),
+          timelineAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+            error: (_, _) => const Text(
+              '加载失败',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+            data: (milestones) {
+              if (milestones.isEmpty) {
+                return const Text(
+                  '暂无里程碑数据',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                );
+              }
+              return Column(
+                children: [
+                  for (int i = 0; i < milestones.length; i++) ...[
+                    Row(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        // Timeline dot + line
+                        SizedBox(
+                          width: 24,
+                          child: Column(
+                            children: [
+                              Container(
+                                width: 10,
+                                height: 10,
+                                decoration: BoxDecoration(
+                                  color: i == milestones.length - 1
+                                      ? AppTheme.primary
+                                      : AppTheme.divider,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(
+                                    color: AppTheme.primary,
+                                    width: 2,
+                                  ),
+                                ),
+                              ),
+                              if (i < milestones.length - 1)
+                                Container(
+                                  width: 2,
+                                  height: 36,
+                                  color: AppTheme.divider,
+                                ),
+                            ],
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Padding(
+                            padding: const EdgeInsets.only(bottom: 8),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                          horizontal: 6, vertical: 2),
+                                      decoration: BoxDecoration(
+                                        color: AppTheme.primary
+                                            .withValues(alpha: 0.1),
+                                        borderRadius:
+                                            BorderRadius.circular(4),
+                                      ),
+                                      child: Text(
+                                        'Day ${milestones[i]['day']}',
+                                        style: const TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.primary,
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(width: 8),
+                                    Expanded(
+                                      child: Text(
+                                        milestones[i]['label'] as String? ??
+                                            '',
+                                        style: const TextStyle(
+                                          fontSize: 13,
+                                          fontWeight: FontWeight.w600,
+                                          color: AppTheme.textPrimary,
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                                const SizedBox(height: 2),
+                                Text(
+                                  milestones[i]['detail'] as String? ?? '',
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: AppTheme.textSecondary,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ],
+              );
+            },
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// AI Learning Rate section.
+class _LearningRateSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final metaAsync = ref.watch(metaInsightsProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text(
+            'AI 学习速率',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimary,
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 14),
+          metaAsync.when(
+            loading: () => const Center(
+              child: Padding(
+                padding: EdgeInsets.all(16),
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+            error: (_, _) => const Text(
+              '加载失败',
+              style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+            ),
+            data: (data) {
+              final rates = (data['learning_rates'] as List<dynamic>?)
+                      ?.cast<Map<String, dynamic>>() ??
+                  [];
+              if (rates.isEmpty) {
+                return const Text(
+                  '暂无学习数据，需要更多已结算判断。',
+                  style: TextStyle(color: AppTheme.textSecondary, fontSize: 13),
+                );
+              }
+              return Column(
+                children: rates.map((lr) {
+                  final status = lr['status'] as String? ?? 'stable';
+                  final label = lr['label'] as String? ?? '';
+                  final marketType = lr['market_type'] as String? ?? '';
+                  final rate = (lr['learning_rate'] as num?)?.toDouble() ?? 0;
+                  final firstAcc = (lr['first_half_accuracy'] as num?)?.toDouble() ?? 0;
+                  final secondAcc = (lr['second_half_accuracy'] as num?)?.toDouble() ?? 0;
+
+                  final statusColor = switch (status) {
+                    'improving' => const Color(0xFF4CAF50),
+                    'declining' => const Color(0xFFEF5350),
+                    _ => AppTheme.flatGray,
+                  };
+                  final statusIcon = switch (status) {
+                    'improving' => Icons.trending_up_rounded,
+                    'declining' => Icons.trending_down_rounded,
+                    _ => Icons.trending_flat_rounded,
+                  };
+
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 10),
+                    child: Row(
+                      children: [
+                        Icon(statusIcon, size: 18, color: statusColor),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                marketType,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary,
+                                ),
+                              ),
+                              Text(
+                                '$label  (${firstAcc.toStringAsFixed(1)}% -> ${secondAcc.toStringAsFixed(1)}%)',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 3),
+                          decoration: BoxDecoration(
+                            color: statusColor.withValues(alpha: 0.12),
+                            borderRadius: BorderRadius.circular(6),
+                          ),
+                          child: Text(
+                            '${rate >= 0 ? "+" : ""}${rate.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: statusColor,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }).toList(),
+              );
+            },
+          ),
+        ],
       ),
     );
   }

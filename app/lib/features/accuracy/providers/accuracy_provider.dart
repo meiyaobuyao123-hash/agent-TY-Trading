@@ -69,3 +69,10 @@ final metaInsightsProvider =
   final repo = ref.watch(accuracyRepositoryProvider);
   return repo.fetchMetaInsights();
 });
+
+/// Provides evolution timeline milestones.
+final evolutionTimelineProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchEvolutionTimeline();
+});

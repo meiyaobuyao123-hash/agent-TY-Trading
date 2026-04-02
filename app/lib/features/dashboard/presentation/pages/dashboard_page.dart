@@ -280,7 +280,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: const Text(
-                    '4个模块',
+                    '5个模块',
                     style: TextStyle(
                       fontSize: 11,
                       fontWeight: FontWeight.w500,
@@ -293,6 +293,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
           ),
         ),
         if (_showDetailSections) ...[
+          const SizedBox(height: 16),
+          SafeSection(
+            fallbackMessage: '宏观信号模块加载异常',
+            builder: () => _buildMacroSignalsSection(ref),
+          ),
           const SizedBox(height: 16),
           SafeSection(
             fallbackMessage: 'AI进化模块加载异常',
@@ -433,6 +438,149 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
           ),
         ),
       ],
+    );
+  }
+
+  // ── Macro Signals section (宏观信号) ──
+  Widget _buildMacroSignalsSection(WidgetRef ref) {
+    final macroAsync = ref.watch(macroSignalsProvider);
+
+    return macroAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (data) {
+        final riskSentiment = data['risk_sentiment'] as String? ?? '中性';
+        final riskDetail = data['risk_detail'] as String? ?? '';
+        final cryptoCorr = data['crypto_equity_correlation'] as String? ?? '无数据';
+        final cryptoDetail = data['crypto_equity_detail'] as String? ?? '';
+        final signals = (data['signals'] as List<dynamic>?)?.cast<String>() ?? [];
+        final rotations = (data['sector_rotations'] as List<dynamic>?) ?? [];
+
+        final riskColor = switch (riskSentiment) {
+          '避险' => AppTheme.downRed,
+          '冒险' => AppTheme.upGreen,
+          _ => AppTheme.flatGray,
+        };
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '宏观信号',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimaryOf(context),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 12),
+              // Risk sentiment
+              Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                    decoration: BoxDecoration(
+                      color: riskColor.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      riskSentiment,
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: riskColor,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      riskDetail,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                      ),
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Crypto-equity correlation
+              Row(
+                children: [
+                  const Text(
+                    '加密-股票: ',
+                    style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                  Text(
+                    '$cryptoCorr  $cryptoDetail',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                    ),
+                  ),
+                ],
+              ),
+              // Sector rotations
+              if (rotations.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                for (final rot in rotations)
+                  Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Row(
+                      children: [
+                        const Icon(Icons.swap_horiz_rounded, size: 14, color: AppTheme.primary),
+                        const SizedBox(width: 6),
+                        Expanded(
+                          child: Text(
+                            (rot as Map<String, dynamic>)['description'] as String? ?? '',
+                            style: const TextStyle(fontSize: 12, color: AppTheme.textSecondary),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+              ],
+              // Signal tags
+              if (signals.isNotEmpty) ...[
+                const SizedBox(height: 10),
+                Wrap(
+                  spacing: 6,
+                  runSpacing: 6,
+                  children: signals.map((s) => Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Text(
+                      s,
+                      style: const TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w500,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  )).toList(),
+                ),
+              ],
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -55,3 +55,10 @@ final dailyReportProvider =
   final repo = ref.watch(dashboardRepositoryProvider);
   return repo.fetchDailyReport();
 });
+
+/// Provides macro signals (宏观信号).
+final macroSignalsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return repo.fetchMacroSignals();
+});
