@@ -51,4 +51,10 @@ class DashboardRepository {
     final response = await _dio.get('/health');
     return response.data as Map<String, dynamic>;
   }
+
+  /// Fetch daily report (日报).
+  Future<Map<String, dynamic>> fetchDailyReport() async {
+    final response = await _dio.get('/stats/daily-report');
+    return response.data as Map<String, dynamic>;
+  }
 }

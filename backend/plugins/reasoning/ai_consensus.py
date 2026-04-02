@@ -442,10 +442,38 @@ def _compute_consensus(votes: list[ModelVote]) -> ConsensusResult:
     combined_reasoning = " | ".join(reasonings)
 
     # Aggregate probabilities across all votes (R13)
+    # Check if any vote has non-trivial probabilities (not all ~0.33)
     n = len(votes)
     avg_up = sum(getattr(v, 'up_probability', 0.0) or 0.0 for v in votes) / n
     avg_down = sum(getattr(v, 'down_probability', 0.0) or 0.0 for v in votes) / n
     avg_flat = sum(getattr(v, 'flat_probability', 0.0) or 0.0 for v in votes) / n
+
+    # R28: 如果平均概率几乎是均匀分布(0.33/0.33/0.33)，
+    # 说明AI未能有效区分方向概率，用共识方向+置信度重新推导
+    max_prob = max(avg_up, avg_down, avg_flat)
+    if max_prob < 0.40:  # 几乎均匀 — 没有方向性信息
+        if majority_dir == Direction.UP:
+            avg_up = conf_score
+            remaining = 1.0 - conf_score
+            avg_down = remaining * 0.55
+            avg_flat = remaining * 0.45
+        elif majority_dir == Direction.DOWN:
+            avg_down = conf_score
+            remaining = 1.0 - conf_score
+            avg_up = remaining * 0.55
+            avg_flat = remaining * 0.45
+        else:
+            avg_flat = max(conf_score, 0.4)
+            remaining = 1.0 - avg_flat
+            avg_up = remaining * 0.5
+            avg_down = remaining * 0.5
+
+    # 归一化
+    total_p = avg_up + avg_down + avg_flat
+    if total_p > 0:
+        avg_up /= total_p
+        avg_down /= total_p
+        avg_flat /= total_p
 
     result = ConsensusResult(
         direction=majority_dir,

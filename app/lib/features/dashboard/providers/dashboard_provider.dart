@@ -48,3 +48,10 @@ final healthStatusProvider =
   final repo = ref.watch(dashboardRepositoryProvider);
   return repo.fetchHealth();
 });
+
+/// Provides daily report (日报).
+final dailyReportProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return repo.fetchDailyReport();
+});

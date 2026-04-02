@@ -13,6 +13,7 @@ import '../../../../shared/widgets/loading_widget.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/signal_card.dart';
 import '../../providers/dashboard_provider.dart';
+import '../../../daily_report/presentation/pages/daily_report_page.dart';
 
 /// Dashboard page — Apple-style flat, minimalist, tech-forward UI.
 class DashboardPage extends ConsumerStatefulWidget {
@@ -1263,6 +1264,22 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
           ],
         ),
         const Spacer(),
+        // 日报按钮
+        GestureDetector(
+          onTap: () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => const _DailyReportPageWrapper(),
+            ),
+          ),
+          child: const Padding(
+            padding: EdgeInsets.only(right: 12, bottom: 4),
+            child: Icon(
+              Icons.article_outlined,
+              size: 24,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+        ),
         // Alerts bell
         GestureDetector(
           onTap: () => _showAlertsSheet(context),
@@ -1883,5 +1900,15 @@ class _PulsingDotState extends State<_PulsingDot>
         ),
       ),
     );
+  }
+}
+
+/// Wrapper to provide ProviderScope for the DailyReportPage when pushed via Navigator.
+class _DailyReportPageWrapper extends StatelessWidget {
+  const _DailyReportPageWrapper();
+
+  @override
+  Widget build(BuildContext context) {
+    return const DailyReportPage();
   }
 }

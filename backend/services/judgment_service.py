@@ -28,6 +28,7 @@ from backend.core.meta_learner import analyze_success_patterns, build_meta_insig
 from backend.plugins.bias_detectors.deviation_calc import calculate_deviation_pct
 from backend.plugins.bias_detectors.cognitive_bias import detect_all_biases
 from backend.plugins.data_sources.fear_greed import get_fear_greed_index
+from backend.services.calibration_service import build_calibration_table, calibrate_probabilities
 
 logger = logging.getLogger(__name__)
 
@@ -751,6 +752,29 @@ async def _process_single_market(
         # 5d. Low-confidence gate (L4 meta-cognition)
         is_low_confidence = calibrated_confidence < 0.2
 
+        # 5e. 概率分布校准 (R28) — 基于历史直方图分桶
+        raw_up = ai_result.get("up_probability")
+        raw_down = ai_result.get("down_probability")
+        raw_flat = ai_result.get("flat_probability")
+        cal_up, cal_down, cal_flat = raw_up, raw_down, raw_flat
+        try:
+            cal_table = await build_calibration_table(session)
+            if cal_table:
+                cal_up, cal_down, cal_flat = calibrate_probabilities(
+                    raw_up, raw_down, raw_flat,
+                    market.market_type, cal_table,
+                )
+                if (cal_up, cal_down, cal_flat) != (raw_up, raw_down, raw_flat):
+                    logger.info(
+                        "概率校准 %s: up %.3f->%.3f, down %.3f->%.3f, flat %.3f->%.3f",
+                        market.symbol,
+                        raw_up or 0, cal_up or 0,
+                        raw_down or 0, cal_down or 0,
+                        raw_flat or 0, cal_flat or 0,
+                    )
+        except Exception:
+            logger.debug("概率校准失败 %s — 使用原始概率", market.symbol)
+
         # 6. Record judgment
         now = datetime.utcnow()
         judgment = Judgment(
@@ -766,9 +790,9 @@ async def _process_single_market(
             quality_score=quality_score,
             reasoning=ai_result.get("reasoning"),
             model_votes=ai_result.get("model_votes"),
-            up_probability=ai_result.get("up_probability"),
-            down_probability=ai_result.get("down_probability"),
-            flat_probability=ai_result.get("flat_probability"),
+            up_probability=cal_up,
+            down_probability=cal_down,
+            flat_probability=cal_flat,
             bias_flags=bias_flags if bias_flags else None,
             is_low_confidence=is_low_confidence,
             regime=regime_data,

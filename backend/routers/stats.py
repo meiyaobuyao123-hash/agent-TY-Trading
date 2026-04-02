@@ -172,25 +172,26 @@ async def get_overview(
             type_brier: dict[str, list[float]] = {}
 
             for j, s, mt in brier_rows:
-                # Get the predicted probability for the actual outcome
+                # 3-class Brier score: mean((pred_i - actual_i)^2) for i in {up, down, flat}
                 actual_dir = s.actual_direction or ("up" if s.is_correct else "down")
-                # Map actual direction to the predicted probability
-                if actual_dir == "up":
-                    pred_prob = j.up_probability if j.up_probability is not None else (
-                        j.confidence_score if j.direction == "up" else (1.0 - j.confidence_score) * 0.5
-                    )
-                elif actual_dir == "down":
-                    pred_prob = j.down_probability if j.down_probability is not None else (
-                        j.confidence_score if j.direction == "down" else (1.0 - j.confidence_score) * 0.5
-                    )
-                else:
-                    pred_prob = j.flat_probability if j.flat_probability is not None else (
-                        j.confidence_score if j.direction == "flat" else (1.0 - j.confidence_score) * 0.5
-                    )
+                up_prob = j.up_probability if j.up_probability is not None else (
+                    j.confidence_score if j.direction == "up" else (1.0 - j.confidence_score) * 0.5
+                )
+                down_prob = j.down_probability if j.down_probability is not None else (
+                    j.confidence_score if j.direction == "down" else (1.0 - j.confidence_score) * 0.5
+                )
+                flat_prob = j.flat_probability if j.flat_probability is not None else (
+                    j.confidence_score if j.direction == "flat" else (1.0 - j.confidence_score) * 0.5
+                )
+                actual_up = 1.0 if actual_dir == "up" else 0.0
+                actual_down = 1.0 if actual_dir == "down" else 0.0
+                actual_flat = 1.0 if actual_dir == "flat" else 0.0
 
-                # Brier score: (predicted_probability - actual_outcome)^2
-                # actual_outcome = 1.0 (the event happened)
-                brier_val = (pred_prob - 1.0) ** 2
+                brier_val = (
+                    (up_prob - actual_up) ** 2
+                    + (down_prob - actual_down) ** 2
+                    + (flat_prob - actual_flat) ** 2
+                ) / 3.0
                 total_brier += brier_val
                 count_brier += 1
 
@@ -1422,3 +1423,210 @@ async def get_global_view(
         regions=regions,
         summary_text=summary_text,
     )
+
+
+# ── 每日报告 (日报) ─────────────────────────────────────────────────────
+
+
+@router.get("/daily-report")
+async def get_daily_report(
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """生成人类可读的每日报告，汇总当日分析情况。
+
+    返回格式化的文本字符串，适合分享或推送通知。
+    """
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_str = today_start.strftime("%Y年%m月%d日")
+
+    # 当日判断数
+    new_j_result = await session.execute(
+        select(func.count()).select_from(Judgment).where(Judgment.created_at >= today_start)
+    )
+    new_judgments = new_j_result.scalar() or 0
+
+    # 当日结算数
+    settle_result = await session.execute(
+        select(func.count()).select_from(Settlement).where(Settlement.settled_at >= today_start)
+    )
+    settlements_today = settle_result.scalar() or 0
+
+    # 当日正确结算数
+    correct_result = await session.execute(
+        select(func.count()).select_from(Settlement).where(
+            Settlement.settled_at >= today_start,
+            Settlement.is_correct == True,
+        )
+    )
+    correct_today = correct_result.scalar() or 0
+    accuracy_today = round(correct_today / settlements_today * 100, 1) if settlements_today > 0 else 0.0
+
+    # 当日分析的市场数（去重）
+    markets_analyzed_result = await session.execute(
+        select(func.count(func.distinct(Judgment.market_id))).where(Judgment.created_at >= today_start)
+    )
+    markets_analyzed = markets_analyzed_result.scalar() or 0
+
+    # 总市场数
+    total_markets_result = await session.execute(
+        select(func.count()).select_from(Market).where(Market.is_active == True)
+    )
+    total_markets = total_markets_result.scalar() or 0
+
+    # 方向分布
+    dir_stmt = select(Judgment.direction).where(Judgment.created_at >= today_start)
+    dir_result = await session.execute(dir_stmt)
+    directions = [r[0] for r in dir_result.all()]
+    up_count = sum(1 for d in directions if d == "up")
+    down_count = sum(1 for d in directions if d == "down")
+    flat_count = sum(1 for d in directions if d == "flat")
+
+    # 市场情绪
+    total_dir = up_count + down_count + flat_count
+    if total_dir > 0:
+        up_pct = up_count / total_dir * 100
+        if up_pct > 65:
+            mood = "偏乐观"
+            mood_icon = "+"
+        elif up_pct < 35:
+            mood = "偏悲观"
+            mood_icon = "-"
+        else:
+            mood = "中性"
+            mood_icon = "="
+    else:
+        mood = "暂无数据"
+        mood_icon = "?"
+
+    # Top 3 高置信信号
+    top_signals = []
+    try:
+        top_stmt = (
+            select(Judgment, Market.symbol)
+            .join(Market, Market.id == Judgment.market_id)
+            .where(Judgment.created_at >= today_start)
+            .order_by(desc(Judgment.confidence_score))
+            .limit(3)
+        )
+        top_result = await session.execute(top_stmt)
+        for j, sym in top_result.all():
+            dir_cn = {"up": "看涨", "down": "看跌", "flat": "观望"}.get(j.direction, j.direction)
+            top_signals.append(f"  {sym}: {dir_cn} (置信度 {j.confidence_score * 100:.0f}%)")
+    except Exception:
+        pass
+
+    # 偏差干预统计
+    bias_count = 0
+    try:
+        bias_stmt = (
+            select(func.count())
+            .select_from(Judgment)
+            .where(
+                Judgment.created_at >= today_start,
+                Judgment.bias_flags.isnot(None),
+            )
+        )
+        bias_result = await session.execute(bias_stmt)
+        bias_count = bias_result.scalar() or 0
+    except Exception:
+        pass
+
+    # Regime变化
+    regime_changes = 0
+    try:
+        regime_stmt = (
+            select(func.count())
+            .select_from(Judgment)
+            .where(
+                Judgment.created_at >= today_start,
+                Judgment.regime.isnot(None),
+            )
+        )
+        regime_result = await session.execute(regime_stmt)
+        regime_changes = regime_result.scalar() or 0
+    except Exception:
+        pass
+
+    # 全局 Brier score
+    brier_text = ""
+    try:
+        brier_stmt = (
+            select(func.avg(Settlement.brier_score))
+            .where(Settlement.brier_score.isnot(None))
+        )
+        brier_result = await session.execute(brier_stmt)
+        avg_brier = brier_result.scalar()
+        if avg_brier is not None:
+            brier_text = f"\n概率校准质量 (Brier): {avg_brier:.4f} {'(优秀)' if avg_brier < 0.2 else '(良好)' if avg_brier < 0.3 else '(待改善)' if avg_brier < 0.4 else '(需优化)'}"
+    except Exception:
+        pass
+
+    # 构建报告文本
+    separator = "─" * 32
+    report_lines = [
+        f"天演 AI 日报 | {today_str}",
+        separator,
+        "",
+        f"[{mood_icon}] 市场情绪: {mood}",
+        f"    看涨 {up_count} | 看跌 {down_count} | 观望 {flat_count}",
+        "",
+        f"分析覆盖: {markets_analyzed}/{total_markets} 个市场",
+        f"新增判断: {new_judgments} 个",
+        f"今日结算: {settlements_today} 个 (准确率 {accuracy_today}%)",
+        brier_text,
+        "",
+        "最强信号 TOP 3:",
+    ]
+    if top_signals:
+        report_lines.extend(top_signals)
+    else:
+        report_lines.append("  暂无信号")
+
+    report_lines.extend([
+        "",
+        separator,
+    ])
+
+    if bias_count > 0:
+        report_lines.append(f"认知偏差干预: {bias_count} 次")
+
+    if regime_changes > 0:
+        report_lines.append(f"市场环境识别: {regime_changes} 个市场")
+
+    report_lines.extend([
+        "",
+        "—— 天演 AI 自动生成 ——",
+    ])
+
+    report_text = "\n".join(report_lines)
+
+    return {
+        "date": today_str,
+        "report": report_text,
+        "stats": {
+            "markets_analyzed": markets_analyzed,
+            "total_markets": total_markets,
+            "new_judgments": new_judgments,
+            "settlements_today": settlements_today,
+            "accuracy_today": accuracy_today,
+            "mood": mood,
+            "up_count": up_count,
+            "down_count": down_count,
+            "flat_count": flat_count,
+            "bias_interventions": bias_count,
+            "top_signals": top_signals,
+        },
+    }
+
+
+# ── 校准诊断 ─────────────────────────────────────────────────────
+
+
+@router.get("/calibration-diagnostics")
+async def get_calibration_diagnostics_endpoint(
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """返回概率校准诊断报告 — 揭示AI的系统性偏差。"""
+    from backend.services.calibration_service import get_calibration_diagnostics
+    diagnostics = await get_calibration_diagnostics(session)
+    return {"diagnostics": diagnostics}

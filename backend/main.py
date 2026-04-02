@@ -105,7 +105,27 @@ async def lifespan(app: FastAPI):
                 if result:
                     logger.info("Genome evolution completed: mutated %s", result)
 
+        async def _snapshot_cleanup():
+            """清理14天前的快照数据，保持系统精简。"""
+            from backend.database import async_session_maker
+            async with async_session_maker() as session:
+                from backend.services.cleanup_service import cleanup_old_snapshots
+                deleted = await cleanup_old_snapshots(session, days=14)
+                if deleted > 0:
+                    logger.info("快照清理完成: 删除了 %d 条旧记录", deleted)
+
         register_jobs(scheduler, _judgment_cycle, _settlement, _accuracy, _genome_evolution)
+
+        # 每天凌晨3点清理旧快照
+        scheduler.add_job(
+            _snapshot_cleanup,
+            "cron",
+            hour=3,
+            minute=0,
+            id="snapshot_cleanup",
+            name="Old Snapshot Cleanup",
+            replace_existing=True,
+        )
 
         # Staleness monitor: check every 30 minutes if judgment cycle is stale
         from backend.core.scheduler import check_cycle_staleness
