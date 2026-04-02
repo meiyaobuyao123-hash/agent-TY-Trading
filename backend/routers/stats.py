@@ -360,10 +360,19 @@ class StreakInsight(BaseModel):
     correct_streak: int
 
 
+class RecommendedWatchItem(BaseModel):
+    symbol: str
+    reason: str
+    direction: str
+    confidence_score: float
+    tag: str  # "高偏差" | "趋势反转" | "高置信"
+
+
 class InsightsResponse(BaseModel):
     highest_confidence: Optional[HighestConfidenceInsight] = None
     biggest_deviation: Optional[BiggestDeviationInsight] = None
     streaks: list[StreakInsight] = []
+    recommended_watch: list[RecommendedWatchItem] = []
 
 
 @router.get("/insights", response_model=InsightsResponse)
@@ -461,10 +470,90 @@ async def get_insights(
 
     streaks.sort(key=lambda s: s.correct_streak, reverse=True)
 
+    # 4. AI 推荐关注: combine high deviation, direction change, high confidence
+    recommended_watch: list[RecommendedWatchItem] = []
+    seen_symbols: set[str] = set()
+
+    # 4a. High deviation significance (potential opportunities)
+    if latest_rows:
+        dev_sorted = sorted(
+            [(row[0], row[1]) for row in latest_rows if row[0].deviation_pct is not None],
+            key=lambda x: abs(x[0].deviation_pct),
+            reverse=True,
+        )
+        for j, sym in dev_sorted[:2]:
+            if sym not in seen_symbols and abs(j.deviation_pct) > 2.0:
+                direction_label = "被低估" if j.deviation_pct > 0 else "被高估"
+                recommended_watch.append(RecommendedWatchItem(
+                    symbol=sym,
+                    reason=f"偏差 {j.deviation_pct:+.1f}% ({direction_label})",
+                    direction=j.direction,
+                    confidence_score=j.confidence_score,
+                    tag="高偏差",
+                ))
+                seen_symbols.add(sym)
+
+    # 4b. Direction changes (regime change / trend reversal)
+    try:
+        shift_stmt = (
+            select(Judgment, Market.symbol)
+            .join(Market, Market.id == Judgment.market_id)
+            .where(Market.is_active == True)
+            .order_by(Market.symbol, desc(Judgment.created_at))
+        )
+        shift_result = await session.execute(shift_stmt)
+        shift_rows = shift_result.all()
+
+        sym_jlist: dict[str, list] = {}
+        for j, sym in shift_rows:
+            sym_jlist.setdefault(sym, [])
+            if len(sym_jlist[sym]) < 2:
+                sym_jlist[sym].append(j)
+
+        dir_cn = {"up": "看涨", "down": "看跌", "flat": "观望"}
+        for sym, jl in sym_jlist.items():
+            if len(jl) < 2 or sym in seen_symbols:
+                continue
+            curr_d = jl[0].direction.lower()
+            prev_d = jl[1].direction.lower()
+            if curr_d != prev_d and curr_d != "flat" and prev_d != "flat":
+                recommended_watch.append(RecommendedWatchItem(
+                    symbol=sym,
+                    reason=f"从{dir_cn.get(prev_d, prev_d)}转为{dir_cn.get(curr_d, curr_d)}",
+                    direction=curr_d,
+                    confidence_score=jl[0].confidence_score,
+                    tag="趋势反转",
+                ))
+                seen_symbols.add(sym)
+                if len(recommended_watch) >= 4:
+                    break
+    except Exception:
+        pass
+
+    # 4c. Highest confidence (AI is most confident)
+    if latest_rows:
+        for row in latest_rows:
+            j, sym = row[0], row[1]
+            if sym not in seen_symbols and j.confidence_score >= 0.65:
+                recommended_watch.append(RecommendedWatchItem(
+                    symbol=sym,
+                    reason=f"AI置信度 {j.confidence_score * 100:.0f}%",
+                    direction=j.direction,
+                    confidence_score=j.confidence_score,
+                    tag="高置信",
+                ))
+                seen_symbols.add(sym)
+                if len(recommended_watch) >= 5:
+                    break
+
+    # Limit to 5
+    recommended_watch = recommended_watch[:5]
+
     return InsightsResponse(
         highest_confidence=highest_confidence,
         biggest_deviation=biggest_deviation,
         streaks=streaks,
+        recommended_watch=recommended_watch,
     )
 
 
@@ -2348,3 +2437,70 @@ async def get_calibration_chart(
     ]
 
     return CalibrationChartResponse(buckets=chart_buckets, perfect_line=perfect_line)
+
+
+# ── News Sentiment (placeholder for future integration) ──────────
+
+
+class NewsSentimentItem(BaseModel):
+    title: str
+    source: str
+    sentiment: str  # "positive" | "negative" | "neutral"
+    relevance: float
+    published_at: str
+
+
+class NewsSentimentResponse(BaseModel):
+    status: str
+    message: str
+    items: list[NewsSentimentItem] = []
+
+
+@router.get("/news-sentiment", response_model=NewsSentimentResponse)
+async def get_news_sentiment(
+    symbol: Optional[str] = Query(None, description="可选: 按市场代码过滤"),
+    session: AsyncSession = Depends(get_session),
+) -> NewsSentimentResponse:
+    """新闻情绪分析 — 当前为占位接口，未来将接入新闻数据源。"""
+    return NewsSentimentResponse(
+        status="placeholder",
+        message="暂无新闻数据 — 新闻情绪分析功能即将上线",
+        items=[],
+    )
+
+
+# ── Confidence History (for sparkline) ──────────────────────────
+
+
+class ConfidenceHistoryItem(BaseModel):
+    confidence_score: float
+    direction: str
+    created_at: str
+
+
+@router.get("/confidence-history/{symbol}", response_model=list[ConfidenceHistoryItem])
+async def get_confidence_history(
+    symbol: str,
+    limit: int = Query(10, ge=1, le=50),
+    session: AsyncSession = Depends(get_session),
+) -> list[ConfidenceHistoryItem]:
+    """返回指定市场最近N次判断的置信度历史，用于AI信心趋势迷你图。"""
+    stmt = (
+        select(Judgment.confidence_score, Judgment.direction, Judgment.created_at)
+        .join(Market, Market.id == Judgment.market_id)
+        .where(Market.symbol == symbol, Market.is_active == True)
+        .order_by(desc(Judgment.created_at))
+        .limit(limit)
+    )
+    result = await session.execute(stmt)
+    rows = result.all()
+
+    # Reverse to chronological order
+    items = []
+    for row in reversed(rows):
+        items.append(ConfidenceHistoryItem(
+            confidence_score=row[0],
+            direction=row[1],
+            created_at=row[2].isoformat(),
+        ))
+    return items

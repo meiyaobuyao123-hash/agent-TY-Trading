@@ -117,6 +117,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
         ref.invalidate(latestJudgmentsProvider);
         ref.invalidate(overviewStatsProvider);
         ref.invalidate(insightsProvider);
+        ref.invalidate(recommendedWatchProvider);
         await ref.read(latestJudgmentsProvider.future);
         HapticFeedback.lightImpact();
         if (mounted) {
@@ -198,6 +199,14 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
 
           // Summary metric cards
           _buildMetricRow(activeMarkets, totalCount, upCount, downCount),
+
+          const SizedBox(height: 20),
+
+          // AI 推荐关注 section
+          SafeSection(
+            fallbackMessage: 'AI\u63a8\u8350\u5173\u6ce8\u52a0\u8f7d\u5f02\u5e38',
+            builder: () => _buildRecommendedWatchSection(ref),
+          ),
 
           const SizedBox(height: 20),
 
@@ -1883,6 +1892,184 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                 icon: Icons.swap_vert_rounded,
                 iconColor:
                     upCount >= downCount ? AppTheme.upGreen : AppTheme.downRed,
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  // ── AI 推荐关注 section ──
+  Widget _buildRecommendedWatchSection(WidgetRef ref) {
+    final watchAsync = ref.watch(recommendedWatchProvider);
+
+    return watchAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (items) {
+        if (items.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 28,
+                  height: 28,
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9500).withValues(alpha: 0.12),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(Icons.star_rounded,
+                      size: 16, color: Color(0xFFFF9500)),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  'AI \u63a8\u8350\u5173\u6ce8',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryOf(context),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF9500).withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${items.length}\u4e2a',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: Color(0xFFFF9500),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            SizedBox(
+              height: 100,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: items.length,
+                separatorBuilder: (_, __) => const SizedBox(width: 10),
+                itemBuilder: (context, i) {
+                  final item = items[i];
+                  final sym = item['symbol'] as String? ?? '';
+                  final reason = item['reason'] as String? ?? '';
+                  final direction = item['direction'] as String? ?? 'flat';
+                  final confidence =
+                      (item['confidence_score'] as num?)?.toDouble() ?? 0.0;
+                  final tag = item['tag'] as String? ?? '';
+
+                  final dirColor = direction == 'up'
+                      ? AppTheme.upGreen
+                      : direction == 'down'
+                          ? AppTheme.downRed
+                          : AppTheme.flatGray;
+
+                  final tagColor = tag == '\u9ad8\u504f\u5dee'
+                      ? const Color(0xFFFF6B00)
+                      : tag == '\u8d8b\u52bf\u53cd\u8f6c'
+                          ? AppTheme.downRed
+                          : AppTheme.primary;
+
+                  return GestureDetector(
+                    onTap: () => context.push('/market/$sym'),
+                    child: Container(
+                      width: 150,
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surfaceOf(context),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(
+                          color: tagColor.withValues(alpha: 0.2),
+                          width: 1,
+                        ),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  sym,
+                                  style: TextStyle(
+                                    fontSize: 14,
+                                    fontWeight: FontWeight.w700,
+                                    color: AppTheme.textPrimaryOf(context),
+                                    letterSpacing: -0.2,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 5, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: tagColor.withValues(alpha: 0.12),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  tag,
+                                  style: TextStyle(
+                                    fontSize: 9,
+                                    fontWeight: FontWeight.w600,
+                                    color: tagColor,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                          Text(
+                            reason,
+                            style: const TextStyle(
+                              fontSize: 11,
+                              color: AppTheme.textSecondary,
+                            ),
+                            maxLines: 2,
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                          Row(
+                            children: [
+                              Container(
+                                width: 8,
+                                height: 8,
+                                decoration: BoxDecoration(
+                                  color: dirColor,
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                              const SizedBox(width: 4),
+                              Text(
+                                '${(confidence * 100).toStringAsFixed(0)}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.w600,
+                                  color: dirColor,
+                                  fontFeatures: const [
+                                    FontFeature.tabularFigures()
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  );
+                },
               ),
             ),
           ],

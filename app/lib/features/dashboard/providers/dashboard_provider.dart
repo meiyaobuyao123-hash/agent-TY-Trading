@@ -62,3 +62,10 @@ final macroSignalsProvider =
   final repo = ref.watch(dashboardRepositoryProvider);
   return repo.fetchMacroSignals();
 });
+
+/// Provides AI recommended watch (推荐关注).
+final recommendedWatchProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return repo.fetchRecommendedWatch();
+});

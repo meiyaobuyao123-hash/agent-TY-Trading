@@ -46,3 +46,18 @@ final marketStatsProvider =
   final repo = ref.watch(marketDetailRepositoryProvider);
   return repo.fetchMarketStats(symbol);
 });
+
+/// Provides confidence history for sparkline chart.
+final confidenceHistoryProvider =
+    FutureProvider.family<List<Map<String, dynamic>>, String>(
+        (ref, symbol) async {
+  final repo = ref.watch(marketDetailRepositoryProvider);
+  return repo.fetchConfidenceHistory(symbol);
+});
+
+/// Provides news sentiment (placeholder).
+final newsSentimentProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, symbol) async {
+  final repo = ref.watch(marketDetailRepositoryProvider);
+  return repo.fetchNewsSentiment(symbol);
+});

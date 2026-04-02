@@ -270,6 +270,17 @@ class MarketDetailPage extends ConsumerWidget {
                   ),
                 ),
 
+                // ── Section 2c: AI信心趋势 — sparkline ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: SafeSection(
+                      fallbackMessage: 'AI信心趋势加载异常',
+                      builder: () => _buildConfidenceTrendSection(ref),
+                    ),
+                  ),
+                ),
+
                 // ── Section 3: 价格走势 — chart ──
                 SliverToBoxAdapter(
                   child: Padding(
@@ -317,6 +328,17 @@ class MarketDetailPage extends ConsumerWidget {
                           builder: () => _buildHistorySection(context, judgments),
                         );
                       },
+                    ),
+                  ),
+                ),
+
+                // ── Section 6: 相关新闻 — placeholder ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: SafeSection(
+                      fallbackMessage: '相关新闻加载异常',
+                      builder: () => _buildNewsSection(ref),
                     ),
                   ),
                 ),
@@ -1325,6 +1347,200 @@ class MarketDetailPage extends ConsumerWidget {
           ),
         ],
       ),
+    );
+  }
+
+  // ── AI信心趋势 — confidence sparkline ──
+  Widget _buildConfidenceTrendSection(WidgetRef ref) {
+    final historyAsync = ref.watch(confidenceHistoryProvider(symbol));
+
+    return historyAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (history) {
+        if (history.length < 2) return const SizedBox.shrink();
+
+        final spots = <FlSpot>[];
+        for (int i = 0; i < history.length; i++) {
+          final score =
+              (history[i]['confidence_score'] as num?)?.toDouble() ?? 0.0;
+          spots.add(FlSpot(i.toDouble(), score * 100));
+        }
+
+        // Determine trend arrow
+        final first = spots.first.y;
+        final last = spots.last.y;
+        final diff = last - first;
+        final trendArrow = diff > 3
+            ? '\u2191'
+            : diff < -3
+                ? '\u2193'
+                : '\u2192';
+        final trendColor = diff > 3
+            ? AppTheme.upGreen
+            : diff < -3
+                ? AppTheme.downRed
+                : AppTheme.flatGray;
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  const Icon(Icons.insights_rounded,
+                      size: 16, color: AppTheme.textSecondary),
+                  const SizedBox(width: 6),
+                  const Text(
+                    'AI\u4fe1\u5fc3\u8d8b\u52bf',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  Text(
+                    trendArrow,
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.w700,
+                      color: trendColor,
+                    ),
+                  ),
+                  const Spacer(),
+                  Text(
+                    '${last.toStringAsFixed(0)}%',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: trendColor,
+                      fontFeatures: const [FontFeature.tabularFigures()],
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 40,
+                child: LineChart(
+                  LineChartData(
+                    gridData: const FlGridData(show: false),
+                    titlesData: const FlTitlesData(show: false),
+                    borderData: FlBorderData(show: false),
+                    lineTouchData: const LineTouchData(enabled: false),
+                    minY: 0,
+                    maxY: 100,
+                    lineBarsData: [
+                      LineChartBarData(
+                        spots: spots,
+                        isCurved: true,
+                        curveSmoothness: 0.3,
+                        color: trendColor,
+                        barWidth: 2,
+                        isStrokeCapRound: true,
+                        dotData: FlDotData(
+                          show: true,
+                          getDotPainter: (spot, _, __, ___) {
+                            if (spot == spots.last) {
+                              return FlDotCirclePainter(
+                                radius: 3,
+                                color: trendColor,
+                                strokeWidth: 0,
+                              );
+                            }
+                            return FlDotCirclePainter(
+                              radius: 0,
+                              color: Colors.transparent,
+                              strokeWidth: 0,
+                            );
+                          },
+                        ),
+                        belowBarData: BarAreaData(
+                          show: true,
+                          color: trendColor.withValues(alpha: 0.08),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  // ── 相关新闻 — placeholder section ──
+  Widget _buildNewsSection(WidgetRef ref) {
+    final newsAsync = ref.watch(newsSentimentProvider(symbol));
+
+    return newsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (data) {
+        final message = data['message'] as String? ?? '\u6682\u65e0\u65b0\u95fb\u6570\u636e';
+        final items = data['items'] as List<dynamic>? ?? [];
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(
+                children: [
+                  Icon(Icons.article_rounded,
+                      size: 16, color: AppTheme.textSecondary),
+                  SizedBox(width: 6),
+                  Text(
+                    '\u76f8\u5173\u65b0\u95fb',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                      letterSpacing: -0.2,
+                    ),
+                  ),
+                  Spacer(),
+                  Text(
+                    '\u5373\u5c06\u4e0a\u7ebf',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.flatGray,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              if (items.isEmpty)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(vertical: 8),
+                    child: Text(
+                      message,
+                      style: const TextStyle(
+                        fontSize: 13,
+                        color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        );
+      },
     );
   }
 

@@ -63,4 +63,16 @@ class DashboardRepository {
     final response = await _dio.get('/stats/macro-signals');
     return response.data as Map<String, dynamic>;
   }
+
+  /// Fetch AI recommended watch (推荐关注) from insights endpoint.
+  Future<List<Map<String, dynamic>>> fetchRecommendedWatch() async {
+    try {
+      final response = await _dio.get('/stats/insights');
+      final data = response.data as Map<String, dynamic>;
+      final items = data['recommended_watch'] as List<dynamic>? ?? [];
+      return items.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
 }

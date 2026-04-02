@@ -61,4 +61,28 @@ class MarketDetailRepository {
       return {};
     }
   }
+
+  /// Fetch confidence history for sparkline chart.
+  Future<List<Map<String, dynamic>>> fetchConfidenceHistory(String symbol,
+      {int limit = 10}) async {
+    try {
+      final response = await _dio.get('/stats/confidence-history/$symbol',
+          queryParameters: {'limit': limit});
+      final List<dynamic> data = response.data as List<dynamic>;
+      return data.cast<Map<String, dynamic>>();
+    } catch (_) {
+      return [];
+    }
+  }
+
+  /// Fetch news sentiment (placeholder).
+  Future<Map<String, dynamic>> fetchNewsSentiment(String symbol) async {
+    try {
+      final response = await _dio.get('/stats/news-sentiment',
+          queryParameters: {'symbol': symbol});
+      return response.data as Map<String, dynamic>;
+    } catch (_) {
+      return {'status': 'placeholder', 'message': '暂无新闻数据', 'items': []};
+    }
+  }
 }
