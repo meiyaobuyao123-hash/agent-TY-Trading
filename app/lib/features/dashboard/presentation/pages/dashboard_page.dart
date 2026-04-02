@@ -168,34 +168,8 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
               ),
             ),
           ),
-          // Milestone badge
-          Padding(
-            padding: const EdgeInsets.only(top: 6),
-            child: Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
-                ),
-                borderRadius: BorderRadius.circular(6),
-              ),
-              child: const Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text('\u{1F3AF}', style: TextStyle(fontSize: 12)),
-                  SizedBox(width: 4),
-                  Text(
-                    '\u5df2\u8986\u76d6340+\u5168\u7403\u5e02\u573a',
-                    style: TextStyle(
-                      fontSize: 11,
-                      color: Colors.white,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
+          // Dynamic market coverage + judgment count badge
+          _buildCoverageBadge(ref),
 
           const SizedBox(height: 16),
 
@@ -1352,6 +1326,46 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
           ],
         ),
       ],
+    );
+  }
+
+  Widget _buildCoverageBadge(WidgetRef ref) {
+    final statsAsync = ref.watch(overviewStatsProvider);
+    return statsAsync.when(
+      loading: () => const SizedBox(height: 6),
+      error: (_, _) => const SizedBox(height: 6),
+      data: (stats) {
+        final marketsTracked = stats['markets_tracked'] ?? 0;
+        final totalJudgments = stats['total_judgments'] ?? 0;
+        return Padding(
+          padding: const EdgeInsets.only(top: 6),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+            decoration: BoxDecoration(
+              gradient: const LinearGradient(
+                colors: [Color(0xFF6366F1), Color(0xFF8B5CF6)],
+              ),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                const Icon(Icons.public_rounded,
+                    size: 13, color: Colors.white70),
+                const SizedBox(width: 5),
+                Text(
+                  '\u8986\u76d6 $marketsTracked \u4e2a\u5168\u7403\u5e02\u573a | $totalJudgments \u6b21AI\u5224\u65ad',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 
