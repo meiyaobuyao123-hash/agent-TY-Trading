@@ -447,7 +447,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 icon: Icons.info_outline_rounded,
                 iconColor: AppTheme.flatGray,
                 title: '版本',
-                value: '2.1.0 (Build 25)',
+                value: '3.0.0 (Build 30)',
               ),
               _settingsRow(
                 icon: Icons.dns_outlined,

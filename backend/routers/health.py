@@ -20,7 +20,7 @@ router = APIRouter(tags=["health"])
 
 class EnhancedHealthResponse(BaseModel):
     status: str = "ok"
-    version: str = "2.1.0"
+    version: str = "3.0.0"
     uptime_seconds: int = 0
     last_cycle_time: Optional[str] = None
     total_markets: int = 0
@@ -88,7 +88,7 @@ async def health_check(
 
     return EnhancedHealthResponse(
         status="ok",
-        version="2.1.0",
+        version="3.0.0",
         uptime_seconds=uptime,
         last_cycle_time=last_cycle_str,
         total_markets=total_markets,
