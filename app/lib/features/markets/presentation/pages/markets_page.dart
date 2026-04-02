@@ -33,11 +33,15 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     'prediction-markets': '预测市场',
     'kr-equities': '韩股',
     'in-equities': '印股',
+    'uk-equities': '英股',
+    'au-equities': '澳股',
+    'latam-equities': '拉美股',
+    'mena-equities': '中东股',
   };
 
   static const _filterChips = [
     _FilterChip(label: '全部', type: null),
-    _FilterChip(label: '我的关注', type: '_favorites'),
+    _FilterChip(label: '关注', type: '_favorites'),
     _FilterChip(label: '加密', type: 'crypto'),
     _FilterChip(label: '美股', type: 'us-equities'),
     _FilterChip(label: 'A股', type: 'cn-equities'),
@@ -48,8 +52,23 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     _FilterChip(label: '欧股', type: 'eu-equities'),
     _FilterChip(label: '韩股', type: 'kr-equities'),
     _FilterChip(label: '印股', type: 'in-equities'),
+    _FilterChip(label: '英股', type: 'uk-equities'),
+    _FilterChip(label: '澳股', type: 'au-equities'),
   ];
 
+  // Region grouping: region label -> market types in that region
+  static const _regionGroups = {
+    '\u{1F1FA}\u{1F1F8} 美国': ['us-equities', 'etf'],
+    '\u{1F1E8}\u{1F1F3} 中国': ['cn-equities', 'hk-equities'],
+    '\u{1F1EF}\u{1F1F5} 日本': ['jp-equities'],
+    '\u{1F1F0}\u{1F1F7} 韩国': ['kr-equities'],
+    '\u{1F1EE}\u{1F1F3} 印度': ['in-equities'],
+    '\u{1F1EA}\u{1F1FA} 欧洲': ['eu-equities', 'uk-equities'],
+    '\u{1F1E6}\u{1F1FA} 大洋洲': ['au-equities'],
+    '\u{1F30D} 全球': ['forex', 'commodities', 'global-indices', 'crypto', 'macro', 'prediction-markets', 'latam-equities', 'mena-equities'],
+  };
+
+  bool _groupByRegion = false;
   String? _selectedFilter;
   String _searchQuery = '';
   final List<Market> _compareSelection = [];
@@ -138,10 +157,21 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
           .toList();
     }
 
-    // Group by market type
+    // Group by market type or region
     final grouped = <String, List<Market>>{};
-    for (final m in filtered) {
-      grouped.putIfAbsent(m.marketType, () => []).add(m);
+    if (_groupByRegion) {
+      for (final entry in _regionGroups.entries) {
+        final regionLabel = entry.key;
+        final types = entry.value;
+        final regionMarkets = filtered.where((m) => types.contains(m.marketType)).toList();
+        if (regionMarkets.isNotEmpty) {
+          grouped[regionLabel] = regionMarkets;
+        }
+      }
+    } else {
+      for (final m in filtered) {
+        grouped.putIfAbsent(_localizedType(m.marketType), () => []).add(m);
+      }
     }
 
     return RefreshIndicator(
@@ -253,6 +283,53 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
             ),
           ),
 
+          // Toggle: 按类型 / 按地区
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(24, 4, 20, 4),
+              child: Row(
+                children: [
+                  GestureDetector(
+                    onTap: () => setState(() => _groupByRegion = !_groupByRegion),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(
+                        color: _groupByRegion
+                            ? AppTheme.primary.withValues(alpha: 0.1)
+                            : AppTheme.surfaceOf(context),
+                        borderRadius: BorderRadius.circular(16),
+                        border: Border.all(
+                          color: _groupByRegion
+                              ? AppTheme.primary.withValues(alpha: 0.3)
+                              : Colors.transparent,
+                        ),
+                      ),
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(
+                            _groupByRegion ? Icons.public_rounded : Icons.category_rounded,
+                            size: 14,
+                            color: _groupByRegion ? AppTheme.primary : AppTheme.textSecondaryOf(context),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            _groupByRegion ? '按地区' : '按类型',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                              color: _groupByRegion ? AppTheme.primary : AppTheme.textSecondaryOf(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
           // Compare hint bar
           if (_compareSelection.length == 1)
             SliverToBoxAdapter(
@@ -311,7 +388,7 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
 
           // Grouped market sections
           ...grouped.entries.expand((entry) {
-            final typeLabel = _localizedType(entry.key);
+            final typeLabel = entry.key;
             final items = entry.value;
             return [
               // Section header

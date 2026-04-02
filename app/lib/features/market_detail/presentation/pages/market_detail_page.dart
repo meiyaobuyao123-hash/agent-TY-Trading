@@ -324,6 +324,39 @@ class MarketDetailPage extends ConsumerWidget {
           );
         }
 
+        if (validSnaps.length < 3) {
+          return Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: AppTheme.surface,
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: const Column(
+              children: [
+                Icon(Icons.hourglass_top_rounded,
+                    size: 32, color: AppTheme.divider),
+                SizedBox(height: 8),
+                Text(
+                  '数据积累中',
+                  style: TextStyle(
+                    color: AppTheme.textPrimary,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                SizedBox(height: 4),
+                Text(
+                  '需要更多数据点才能显示走势图',
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          );
+        }
+
         return _PriceChart(snapshots: validSnaps);
       },
     );
@@ -951,18 +984,34 @@ class _PriceChart extends StatelessWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Row(
+          Row(
             children: [
-              Icon(Icons.show_chart_rounded,
+              const Icon(Icons.show_chart_rounded,
                   size: 16, color: AppTheme.textSecondary),
-              SizedBox(width: 6),
-              Text(
+              const SizedBox(width: 6),
+              const Text(
                 '价格走势',
                 style: TextStyle(
                   fontSize: 15,
                   fontWeight: FontWeight.w600,
                   color: AppTheme.textPrimary,
                   letterSpacing: -0.2,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.08),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  _timePeriodLabel(),
+                  style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.primary,
+                  ),
                 ),
               ),
             ],
@@ -1081,6 +1130,19 @@ class _PriceChart extends StatelessWidget {
         ],
       ),
     );
+  }
+
+  String _timePeriodLabel() {
+    if (snapshots.length < 2) return '数据不足';
+    final first = snapshots.first.capturedAt;
+    final last = snapshots.last.capturedAt;
+    final days = last.difference(first).inDays;
+    if (days <= 1) return '近24小时';
+    if (days <= 3) return '近3天';
+    if (days <= 7) return '近7天';
+    if (days <= 14) return '近14天';
+    if (days <= 30) return '近30天';
+    return '近$days天';
   }
 
   String _formatChartPrice(double price) {

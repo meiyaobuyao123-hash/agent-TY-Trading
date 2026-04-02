@@ -72,6 +72,15 @@ SYMBOL_MAP = {
     "YFI-USD": "YFIUSDT",
     "BAL-USD": "BALUSDT",
     "MEME-USD": "MEMEUSDT",
+    # Round 21 — DeFi/L2 expansion
+    "PENDLE-USD": "PENDLEUSDT",
+    "ENA-USD": "ENAUSDT",
+    "STRK-USD": "STRKUSDT",
+    "ZRO-USD": "ZROUSDT",
+    "ETHFI-USD": "ETHFIUSDT",
+    "W-USD": "WUSDT",
+    "ONDO-USD": "ONDOUSDT",
+    "JTO-USD": "JTOUSDT",
 }
 
 REVERSE_MAP = {v: k for k, v in SYMBOL_MAP.items()}

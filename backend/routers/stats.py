@@ -7,7 +7,7 @@ from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
 from pydantic import BaseModel
-from sqlalchemy import select, func, desc, and_
+from sqlalchemy import select, func, desc, and_, Integer
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -963,3 +963,122 @@ async def get_meta_insights(
 
     result = await analyze_success_patterns(session)
     return MetaInsightsResponse(**result)
+
+
+# ── Daily Summary ─────────────────────────────────────────────────────────
+
+
+class DailySummaryResponse(BaseModel):
+    date: str
+    markets_analyzed: int
+    new_judgments: int
+    settlements_today: int
+    best_market: Optional[str] = None
+    best_market_accuracy: Optional[float] = None
+    worst_market: Optional[str] = None
+    worst_market_accuracy: Optional[float] = None
+    sentiment_shift: Optional[str] = None
+    up_count: int = 0
+    down_count: int = 0
+    flat_count: int = 0
+
+
+@router.get("/daily-summary", response_model=DailySummaryResponse)
+async def get_daily_summary(
+    session: AsyncSession = Depends(get_session),
+) -> DailySummaryResponse:
+    """返回每日摘要 — 当日分析/判断/结算数据及最佳/最差市场表现。"""
+    today_start = datetime.utcnow().replace(hour=0, minute=0, second=0, microsecond=0)
+    today_str = today_start.strftime("%Y-%m-%d")
+
+    # 当日判断数
+    new_j_result = await session.execute(
+        select(func.count()).select_from(Judgment).where(Judgment.created_at >= today_start)
+    )
+    new_judgments = new_j_result.scalar() or 0
+
+    # 当日结算数
+    settle_result = await session.execute(
+        select(func.count()).select_from(Settlement).where(Settlement.settled_at >= today_start)
+    )
+    settlements_today = settle_result.scalar() or 0
+
+    # 当日分析的市场数（去重）
+    markets_analyzed_result = await session.execute(
+        select(func.count(func.distinct(Judgment.market_id))).where(Judgment.created_at >= today_start)
+    )
+    markets_analyzed = markets_analyzed_result.scalar() or 0
+
+    # 方向分布（当日最新判断）
+    dir_stmt = (
+        select(Judgment.direction)
+        .where(Judgment.created_at >= today_start)
+    )
+    dir_result = await session.execute(dir_stmt)
+    directions = [r[0] for r in dir_result.all()]
+    up_count = sum(1 for d in directions if d == "up")
+    down_count = sum(1 for d in directions if d == "down")
+    flat_count = sum(1 for d in directions if d == "flat")
+
+    # 情绪变化描述
+    total_dir = up_count + down_count + flat_count
+    if total_dir > 0:
+        up_pct = up_count / total_dir * 100
+        if up_pct > 65:
+            sentiment_shift = "偏乐观 — 多数市场看涨"
+        elif up_pct < 35:
+            sentiment_shift = "偏悲观 — 多数市场看跌"
+        else:
+            sentiment_shift = "中性 — 多空均衡"
+    else:
+        sentiment_shift = "暂无数据"
+
+    # 最佳/最差市场（基于全部已结算判断，按市场）
+    best_market = None
+    best_accuracy = None
+    worst_market = None
+    worst_accuracy = None
+
+    try:
+        per_market_stmt = (
+            select(
+                Market.symbol,
+                func.count(Settlement.id).label("total"),
+                func.sum(func.cast(Settlement.is_correct, Integer)).label("correct"),
+            )
+            .join(Judgment, Judgment.market_id == Market.id)
+            .join(Settlement, Settlement.judgment_id == Judgment.id)
+            .where(Settlement.is_correct.isnot(None))
+            .group_by(Market.symbol)
+            .having(func.count(Settlement.id) >= 3)
+        )
+        per_market_result = await session.execute(per_market_stmt)
+        per_market_rows = per_market_result.all()
+
+        if per_market_rows:
+            scored = []
+            for sym, total, correct in per_market_rows:
+                acc = (correct or 0) / total * 100 if total > 0 else 0
+                scored.append((sym, acc, total))
+            scored.sort(key=lambda x: x[1], reverse=True)
+            best_market = scored[0][0]
+            best_accuracy = round(scored[0][1], 1)
+            worst_market = scored[-1][0]
+            worst_accuracy = round(scored[-1][1], 1)
+    except Exception:
+        pass
+
+    return DailySummaryResponse(
+        date=today_str,
+        markets_analyzed=markets_analyzed,
+        new_judgments=new_judgments,
+        settlements_today=settlements_today,
+        best_market=best_market,
+        best_market_accuracy=best_accuracy,
+        worst_market=worst_market,
+        worst_market_accuracy=worst_accuracy,
+        sentiment_shift=sentiment_shift,
+        up_count=up_count,
+        down_count=down_count,
+        flat_count=flat_count,
+    )

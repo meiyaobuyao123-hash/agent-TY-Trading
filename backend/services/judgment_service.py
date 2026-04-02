@@ -62,6 +62,11 @@ async def _fetch_crypto_mcap_rankings() -> dict[str, dict]:
         "sushi": "SUSHI-USD", "1inch": "1INCH-USD",
         "balancer": "BAL-USD", "yearn-finance": "YFI-USD",
         "memecoin-2": "MEME-USD",
+        # R21 DeFi/L2
+        "pendle": "PENDLE-USD", "ethena": "ENA-USD",
+        "starknet": "STRK-USD", "layerzero": "ZRO-USD",
+        "ether-fi": "ETHFI-USD", "wormhole": "W-USD",
+        "ondo-finance": "ONDO-USD", "jito-governance-token": "JTO-USD",
     }
 
     try:
@@ -124,6 +129,8 @@ DATA_SOURCE_MAP = {
     "in-equities": "yfinance-global",
     "latam-equities": "yfinance-global",
     "mena-equities": "yfinance-global",
+    "uk-equities": "yfinance-global",
+    "au-equities": "yfinance-global",
 }
 
 # Different prediction horizons per market type
@@ -144,6 +151,8 @@ HORIZON_MAP = {
     "in-equities": 24,
     "latam-equities": 24,
     "mena-equities": 24,
+    "uk-equities": 24,
+    "au-equities": 24,
 }
 
 # Map market_type string to MarketType enum for DataQuery
@@ -164,6 +173,8 @@ _MARKET_TYPE_ENUM = {
     "in-equities": MarketType.IN_EQUITIES,
     "latam-equities": MarketType.LATAM_EQUITIES,
     "mena-equities": MarketType.MENA_EQUITIES,
+    "uk-equities": MarketType.UK_EQUITIES,
+    "au-equities": MarketType.AU_EQUITIES,
 }
 
 
