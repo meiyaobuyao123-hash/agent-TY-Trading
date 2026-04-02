@@ -31,6 +31,8 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     'macro': '宏观指标',
     'etf': 'ETF基金',
     'prediction-markets': '预测市场',
+    'kr-equities': '韩股',
+    'in-equities': '印股',
   };
 
   static const _filterChips = [
@@ -44,6 +46,8 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     _FilterChip(label: '宏观', type: 'macro'),
     _FilterChip(label: '日股', type: 'jp-equities'),
     _FilterChip(label: '欧股', type: 'eu-equities'),
+    _FilterChip(label: '韩股', type: 'kr-equities'),
+    _FilterChip(label: '印股', type: 'in-equities'),
   ];
 
   String? _selectedFilter;

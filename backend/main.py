@@ -142,7 +142,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Project TY (天演) API",
         description="AI Financial World Model — Self-evolving judgment tracker",
-        version="1.1.0",
+        version="2.0.0",
         lifespan=lifespan,
     )
 

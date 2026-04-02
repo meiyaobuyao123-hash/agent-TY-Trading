@@ -106,6 +106,18 @@ CORRELATIONS: dict[str, list[str]] = {
     "EEM": ["VWO", "FXI", "SPY"],
     "VWO": ["EEM", "FXI", "SPY"],
     "FXI": ["HSI", "EEM", "VWO"],
+    # R17 — Korean stocks
+    "005930.KR": ["000660.KR", "SPX", "IXIC"],
+    "000660.KR": ["005930.KR", "SPX"],
+    "373220.KR": ["005930.KR", "005380.KR"],
+    "005380.KR": ["005930.KR", "373220.KR"],
+    "035420.KR": ["005930.KR", "GOOGL"],
+    # R17 — Indian stocks
+    "RELIANCE.IN": ["TCS.IN", "HDFCBANK.IN"],
+    "TCS.IN": ["INFY.IN", "RELIANCE.IN"],
+    "INFY.IN": ["TCS.IN", "RELIANCE.IN"],
+    "HDFCBANK.IN": ["RELIANCE.IN", "TCS.IN"],
+    "BHARTIARTL.IN": ["RELIANCE.IN", "HDFCBANK.IN"],
 }
 
 # Benchmark symbols per market type (used for cross-market context)
@@ -118,6 +130,8 @@ MARKET_BENCHMARKS: dict[str, list[str]] = {
     "forex": ["USD/CNY", "EUR/USD"],
     "commodities": ["GC=F", "CL=F"],
     "etf": ["SPY", "QQQ"],
+    "kr-equities": ["005930.KR"],
+    "in-equities": ["RELIANCE.IN"],
 }
 
 

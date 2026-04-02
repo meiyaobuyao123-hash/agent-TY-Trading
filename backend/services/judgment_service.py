@@ -116,6 +116,8 @@ DATA_SOURCE_MAP = {
     "forex": "frankfurter-fx",
     "prediction-markets": "polymarket-gamma",
     "etf": "yfinance-global",
+    "kr-equities": "yfinance-global",
+    "in-equities": "yfinance-global",
 }
 
 # Different prediction horizons per market type
@@ -132,6 +134,8 @@ HORIZON_MAP = {
     "macro": 168,  # 7 days for macro indicators
     "prediction-markets": 24,
     "etf": 24,
+    "kr-equities": 24,
+    "in-equities": 24,
 }
 
 # Map market_type string to MarketType enum for DataQuery
@@ -148,6 +152,8 @@ _MARKET_TYPE_ENUM = {
     "forex": MarketType.FOREX,
     "prediction-markets": MarketType.PREDICTION_MARKETS,
     "etf": MarketType.ETF,
+    "kr-equities": MarketType.KR_EQUITIES,
+    "in-equities": MarketType.IN_EQUITIES,
 }
 
 
@@ -705,10 +711,24 @@ async def trigger_judgment_cycle(
     logger.info("Batch tick fetch complete: %d/%d symbols have data", len(tick_cache), len(markets))
 
     # 3. Process markets sequentially (SQLAlchemy async session is not safe for concurrent flushes)
+    # Add 30-minute cycle timeout to prevent runaway cycles
+    CYCLE_TIMEOUT_SEC = 30 * 60  # 30 minutes max
     judgments: list[Judgment] = []
     skipped_count = 0
+    timeout_reached = False
 
     for market in markets:
+        # Check cycle timeout
+        elapsed = time.time() - cycle_start
+        if elapsed > CYCLE_TIMEOUT_SEC:
+            remaining = len(markets) - len(judgments) - skipped_count
+            logger.warning(
+                "判断周期超时(%.0f分钟)，已完成 %d/%d 个市场，跳过剩余 %d 个",
+                elapsed / 60, len(judgments), len(markets), remaining,
+            )
+            timeout_reached = True
+            break
+
         try:
             j = await _process_single_market(
                 market, plugin_manager, session, reasoning, horizon_hours, tick_cache
@@ -726,14 +746,10 @@ async def trigger_judgment_cycle(
 
     cycle_duration = time.time() - cycle_start
     logger.info(
-        "Judgment cycle complete",
-        extra={
-            "total_markets": len(markets),
-            "judgments_created": len(judgments),
-            "skipped_no_data": skipped_count,
-            "cycle_duration_sec": round(cycle_duration, 2),
-            "data_source_errors": data_source_errors,
-        },
+        "判断周期完成: %d/%d 个判断, 跳过 %d, 耗时 %.1f 分钟%s",
+        len(judgments), len(markets), skipped_count,
+        cycle_duration / 60,
+        " (超时截断)" if timeout_reached else "",
     )
 
     return judgments

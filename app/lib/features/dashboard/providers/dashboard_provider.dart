@@ -41,3 +41,10 @@ final discoveriesProvider =
   final repo = ref.watch(dashboardRepositoryProvider);
   return repo.fetchDiscoveries();
 });
+
+/// Provides system health status for the live indicator.
+final healthStatusProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return repo.fetchHealth();
+});

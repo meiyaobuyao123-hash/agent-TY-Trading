@@ -24,6 +24,8 @@ class MarketType(str, Enum):
     DEFI = "defi"
     MACRO = "macro"
     ETF = "etf"
+    KR_EQUITIES = "kr-equities"
+    IN_EQUITIES = "in-equities"
 
 
 class Timeframe(str, Enum):

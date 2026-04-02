@@ -150,7 +150,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'AI每4小时分析全球185个市场，给出方向判断和合理价格估值',
+                      'AI每4小时分析全球195个市场，给出方向判断和合理价格估值',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -1077,28 +1077,104 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return cards;
   }
 
+  /// Compute system health color: green/yellow/red based on /health data.
+  Color _systemHealthColor(AsyncValue<Map<String, dynamic>> healthAsync) {
+    final data = healthAsync.valueOrNull;
+    if (data == null) {
+      // Loading or error => red if error, gray if loading
+      return healthAsync.hasError ? AppTheme.downRed : AppTheme.flatGray;
+    }
+    if (data['status'] != 'ok') return AppTheme.downRed;
+
+    // Check last_cycle_time — if >5h ago, yellow
+    final lastCycleStr = data['last_cycle_time'] as String?;
+    if (lastCycleStr != null) {
+      try {
+        final lastCycle = DateTime.parse(lastCycleStr);
+        final hoursSince = DateTime.now().toUtc().difference(lastCycle).inHours;
+        if (hoursSince > 5) return const Color(0xFFF59E0B); // yellow
+      } catch (_) {}
+    } else {
+      // No cycle ever run — yellow
+      return const Color(0xFFF59E0B);
+    }
+
+    // Check plugins health
+    final plugins = data['plugins'] as Map<String, dynamic>? ?? {};
+    int unhealthy = 0;
+    for (final entry in plugins.values) {
+      final info = entry as Map<String, dynamic>? ?? {};
+      if (info['healthy'] != true) unhealthy++;
+    }
+    if (unhealthy > 2) return const Color(0xFFF59E0B); // yellow
+
+    return AppTheme.upGreen;
+  }
+
+  String _systemHealthLabel(Color color) {
+    if (color == AppTheme.upGreen) return '系统正常';
+    if (color == AppTheme.downRed) return '系统离线';
+    if (color == AppTheme.flatGray) return '检测中...';
+    return '部分异常';
+  }
+
   Widget _buildHeader() {
     final now = DateTime.now();
     final timeStr = DateFormat('HH:mm').format(now);
     final dateStr = DateFormat('MM月dd日').format(now);
     final alertsAsync = ref.watch(alertsProvider);
     final alertCount = alertsAsync.valueOrNull?.length ?? 0;
+    final healthAsync = ref.watch(healthStatusProvider);
+    final healthColor = _systemHealthColor(healthAsync);
 
     return Row(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
-        // Left: title
+        // Left: title + system status
         Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '天演',
-              style: TextStyle(
-                fontSize: 28,
-                fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimaryOf(context),
-                letterSpacing: -0.5,
-              ),
+            Row(
+              children: [
+                Text(
+                  '天演',
+                  style: TextStyle(
+                    fontSize: 28,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimaryOf(context),
+                    letterSpacing: -0.5,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                // System health dot
+                GestureDetector(
+                  onTap: () {
+                    final label = _systemHealthLabel(healthColor);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(label),
+                        duration: const Duration(seconds: 2),
+                        behavior: SnackBarBehavior.floating,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    width: 10,
+                    height: 10,
+                    decoration: BoxDecoration(
+                      color: healthColor,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: healthColor.withValues(alpha: 0.5),
+                          blurRadius: 6,
+                          spreadRadius: 1,
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 2),
             Text(

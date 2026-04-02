@@ -76,6 +76,12 @@ STOOQ_MAP = {
     # R15 — European stocks
     "SAP.DE": "sap.de", "SIE.DE": "sie.de", "BMW.DE": "bmw.de",
     "ASML.NL": "asml.nl", "MC.PA": "mc.fr", "TTE.PA": "tte.fr",
+    # R17 — Korean stocks
+    "005930.KR": "005930.kr", "000660.KR": "000660.kr", "373220.KR": "373220.kr",
+    "005380.KR": "005380.kr", "035420.KR": "035420.kr",
+    # R17 — Indian stocks
+    "RELIANCE.IN": "reliance.in", "TCS.IN": "tcs.in", "INFY.IN": "infy.in",
+    "HDFCBANK.IN": "hdfcbank.in", "BHARTIARTL.IN": "bhartiartl.in",
 }
 
 # yfinance symbol map (fallback)
@@ -121,6 +127,12 @@ YFINANCE_MAP = {
     # R15 — European stocks
     "SAP.DE": "SAP.DE", "SIE.DE": "SIE.DE", "BMW.DE": "BMW.DE",
     "ASML.NL": "ASML.AS", "MC.PA": "MC.PA", "TTE.PA": "TTE.PA",
+    # R17 — Korean stocks
+    "005930.KR": "005930.KS", "000660.KR": "000660.KS", "373220.KR": "373220.KS",
+    "005380.KR": "005380.KS", "035420.KR": "035420.KS",
+    # R17 — Indian stocks
+    "RELIANCE.IN": "RELIANCE.NS", "TCS.IN": "TCS.NS", "INFY.IN": "INFY.NS",
+    "HDFCBANK.IN": "HDFCBANK.NS", "BHARTIARTL.IN": "BHARTIARTL.NS",
 }
 
 # Market type classification
@@ -151,6 +163,8 @@ COMMODITIES = {
 }
 JP_STOCKS = {"7203.JP", "6758.JP", "6861.JP", "9984.JP", "8306.JP"}
 EU_STOCKS = {"SAP.DE", "SIE.DE", "BMW.DE", "ASML.NL", "MC.PA", "TTE.PA"}
+KR_STOCKS = {"005930.KR", "000660.KR", "373220.KR", "005380.KR", "035420.KR"}
+IN_STOCKS = {"RELIANCE.IN", "TCS.IN", "INFY.IN", "HDFCBANK.IN", "BHARTIARTL.IN"}
 
 
 def _market_type_for(symbol: str) -> MarketType:
@@ -164,6 +178,10 @@ def _market_type_for(symbol: str) -> MarketType:
         return MarketType.JP_EQUITIES
     if symbol in EU_STOCKS:
         return MarketType.EU_EQUITIES
+    if symbol in KR_STOCKS:
+        return MarketType.KR_EQUITIES
+    if symbol in IN_STOCKS:
+        return MarketType.IN_EQUITIES
     if symbol in INDICES:
         return MarketType.GLOBAL_INDICES
     if symbol in COMMODITIES:
@@ -196,6 +214,8 @@ class YFinanceDataSource(DataSourcePlugin):
             MarketType.HK_EQUITIES,
             MarketType.JP_EQUITIES,
             MarketType.EU_EQUITIES,
+            MarketType.KR_EQUITIES,
+            MarketType.IN_EQUITIES,
             MarketType.GLOBAL_INDICES,
             MarketType.COMMODITIES,
         ]

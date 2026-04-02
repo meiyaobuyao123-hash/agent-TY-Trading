@@ -45,4 +45,10 @@ class DashboardRepository {
     final data = response.data as List<dynamic>;
     return data.cast<Map<String, dynamic>>();
   }
+
+  /// Fetch system health status for the live indicator.
+  Future<Map<String, dynamic>> fetchHealth() async {
+    final response = await _dio.get('/health');
+    return response.data as Map<String, dynamic>;
+  }
 }
