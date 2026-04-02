@@ -154,6 +154,36 @@ class AccuracyStat(Base):
     calculated_at = Column(DateTime, default=datetime.utcnow)
 
 
+class ConfidenceHistory(Base):
+    """Track the last N confidence scores per market for trend detection."""
+    __tablename__ = "confidence_history"
+    __table_args__ = (
+        Index("ix_confidence_history_market_created", "market_id", "created_at"),
+    )
+
+    id = Column(UUIDString(), primary_key=True, default=uuid.uuid4)
+    market_id = Column(UUIDString(), ForeignKey("markets.id"), nullable=False)
+    confidence_score = Column(Float, nullable=False)
+    direction = Column(String(10), nullable=False)
+    created_at = Column(DateTime, default=datetime.utcnow)
+
+
+class MarketPriority(Base):
+    """Smart scheduling priority score per market."""
+    __tablename__ = "market_priorities"
+    __table_args__ = (
+        Index("ix_market_priorities_score", "priority_score"),
+    )
+
+    id = Column(UUIDString(), primary_key=True, default=uuid.uuid4)
+    market_id = Column(UUIDString(), ForeignKey("markets.id"), unique=True, nullable=False)
+    priority_score = Column(Float, default=50.0)  # 0-100, higher = more important
+    accuracy_factor = Column(Float, default=0.0)
+    bias_factor = Column(Float, default=0.0)
+    settlement_factor = Column(Float, default=0.0)
+    updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
+
+
 class Plugin(Base):
     __tablename__ = "plugins"
 

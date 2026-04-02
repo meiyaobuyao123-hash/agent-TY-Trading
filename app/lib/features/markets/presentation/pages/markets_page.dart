@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
@@ -189,6 +190,7 @@ class _MarketsPageState extends ConsumerState<MarketsPage>
       onRefresh: () async {
         ref.invalidate(marketsProvider);
         await ref.read(marketsProvider.future);
+        HapticFeedback.lightImpact();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -269,6 +271,7 @@ class _MarketsPageState extends ConsumerState<MarketsPage>
                       padding: const EdgeInsets.only(right: 8),
                       child: GestureDetector(
                         onTap: () {
+                          HapticFeedback.lightImpact();
                           setState(() => _selectedFilter = chip.type);
                         },
                         child: AnimatedContainer(

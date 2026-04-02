@@ -12,7 +12,7 @@ from typing import Optional
 
 import httpx
 
-from sqlalchemy import select, desc
+from sqlalchemy import select, desc, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
@@ -818,6 +818,36 @@ async def _process_single_market(
             created_at=now,
         )
         session.add(judgment)
+
+        # Record confidence history (keep last 10 per market)
+        try:
+            from backend.models import ConfidenceHistory
+            conf_entry = ConfidenceHistory(
+                id=uuid.uuid4(),
+                market_id=market.id,
+                confidence_score=round(calibrated_confidence, 3),
+                direction=ai_result.get("direction", "flat"),
+                created_at=now,
+            )
+            session.add(conf_entry)
+
+            # Prune old entries (keep last 10)
+            old_entries_stmt = (
+                select(ConfidenceHistory.id)
+                .where(ConfidenceHistory.market_id == market.id)
+                .order_by(desc(ConfidenceHistory.created_at))
+                .offset(10)
+            )
+            old_result = await session.execute(old_entries_stmt)
+            old_ids = [row[0] for row in old_result.all()]
+            if old_ids:
+                from sqlalchemy import delete
+                await session.execute(
+                    delete(ConfidenceHistory).where(ConfidenceHistory.id.in_(old_ids))
+                )
+        except Exception:
+            logger.debug("Failed to record confidence history for %s", market.symbol)
+
         logger.info(
             "Judgment for %s: %s (%s, %.1f%%)",
             market.symbol,
@@ -829,6 +859,94 @@ async def _process_single_market(
     except Exception:
         logger.exception("Failed judgment for market %s", market.symbol)
         return None
+
+
+async def _sort_markets_by_priority(
+    session: AsyncSession,
+    markets: list[Market],
+) -> list[Market]:
+    """Sort markets by priority score: high-value markets processed first.
+
+    Priority factors:
+    - Accuracy: markets with higher accuracy get higher priority
+    - Bias interventions: markets with recent bias corrections need careful analysis
+    - Settlement history: markets with no settlements are deprioritized
+    """
+    from backend.models import MarketPriority
+
+    market_scores: dict[str, float] = {}
+
+    for market in markets:
+        score = 50.0  # base score
+
+        try:
+            # Factor 1: Accuracy — markets with settled judgments and high accuracy
+            settled_stmt = (
+                select(func.count())
+                .select_from(Settlement)
+                .join(Judgment, Settlement.judgment_id == Judgment.id)
+                .where(Judgment.market_id == market.id, Settlement.is_correct.isnot(None))
+            )
+            settled_result = await session.execute(settled_stmt)
+            settled_count = settled_result.scalar() or 0
+
+            if settled_count == 0:
+                score -= 15  # deprioritize markets with no settlement history
+
+            if settled_count >= 3:
+                correct_stmt = (
+                    select(func.count())
+                    .select_from(Settlement)
+                    .join(Judgment, Settlement.judgment_id == Judgment.id)
+                    .where(
+                        Judgment.market_id == market.id,
+                        Settlement.is_correct == True,
+                    )
+                )
+                correct_result = await session.execute(correct_stmt)
+                correct_count = correct_result.scalar() or 0
+                accuracy = correct_count / settled_count
+                score += accuracy * 20  # up to +20 for 100% accuracy
+
+            # Factor 2: Recent bias interventions
+            recent_cutoff = datetime.utcnow() - timedelta(hours=24)
+            recent_j_stmt = (
+                select(Judgment.bias_flags)
+                .where(
+                    Judgment.market_id == market.id,
+                    Judgment.created_at >= recent_cutoff,
+                )
+                .order_by(desc(Judgment.created_at))
+                .limit(1)
+            )
+            recent_j_result = await session.execute(recent_j_stmt)
+            recent_bias = recent_j_result.scalar()
+            if recent_bias and isinstance(recent_bias, list):
+                has_intervention = any(
+                    f.get("intervention") for f in recent_bias if isinstance(f, dict)
+                )
+                if has_intervention:
+                    score += 10  # prioritize markets that needed bias correction
+
+            # Factor 3: Market type importance (crypto/us-equities are watched more)
+            type_bonus = {
+                "crypto": 5, "us-equities": 5, "cn-equities": 3,
+                "global-indices": 3, "forex": 2, "commodities": 2,
+            }
+            score += type_bonus.get(market.market_type, 0)
+
+        except Exception:
+            pass  # keep default score
+
+        market_scores[str(market.id)] = max(0, min(100, score))
+
+    # Sort descending by score
+    markets.sort(key=lambda m: market_scores.get(str(m.id), 50), reverse=True)
+
+    top_5 = [(m.symbol, round(market_scores.get(str(m.id), 50), 1)) for m in markets[:5]]
+    logger.info("智能调度: 前5优先市场 %s", top_5)
+
+    return markets
 
 
 async def trigger_judgment_cycle(
@@ -853,11 +971,15 @@ async def trigger_judgment_cycle(
         stmt = select(Market).where(Market.is_active == True)
 
     result = await session.execute(stmt)
-    markets = result.scalars().all()
+    markets = list(result.scalars().all())
 
     if not markets:
         logger.warning("No active markets found for judgment cycle")
         return []
+
+    # Smart scheduling: sort markets by priority (high-priority first)
+    if not symbols:
+        markets = await _sort_markets_by_priority(session, markets)
 
     # Get reasoning plugin
     reasoning = plugin_manager.get_reasoning("ai-consensus")

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_theme.dart';
@@ -25,6 +26,7 @@ class SignalCard extends StatelessWidget {
   final double? downProbability;
   final double? flatProbability;
   final List<BiasFlag>? biasFlags;
+  final MarketRegime? regime;
   final bool isFavorite;
   final VoidCallback? onTap;
   final VoidCallback? onToggleFavorite;
@@ -48,6 +50,7 @@ class SignalCard extends StatelessWidget {
     this.downProbability,
     this.flatProbability,
     this.biasFlags,
+    this.regime,
     this.isFavorite = false,
     this.onTap,
     this.onToggleFavorite,
@@ -153,7 +156,10 @@ class SignalCard extends StatelessWidget {
     final displayName = _chineseName(symbol);
 
     return GestureDetector(
-      onTap: onTap,
+      onTap: () {
+        HapticFeedback.lightImpact();
+        onTap?.call();
+      },
       child: Container(
         padding: const EdgeInsets.all(16),
         decoration: AppTheme.cardDecorationOf(context),
@@ -165,7 +171,10 @@ class SignalCard extends StatelessWidget {
               children: [
                 // Star icon
                 GestureDetector(
-                  onTap: onToggleFavorite,
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    onToggleFavorite?.call();
+                  },
                   child: Padding(
                     padding: const EdgeInsets.only(right: 6),
                     child: Icon(
@@ -262,6 +271,31 @@ class SignalCard extends StatelessWidget {
                         Icons.ios_share_rounded,
                         size: 12,
                         color: AppTheme.textSecondary,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 6),
+                GestureDetector(
+                  onTap: () {
+                    HapticFeedback.lightImpact();
+                    _showWhyExplainer(context);
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: const Text(
+                      '为什么?',
+                      style: TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
@@ -699,6 +733,222 @@ class SignalCard extends StatelessWidget {
     final text =
         '天演AI信号 | $displayName $directionCn (把握度$confPct%) | 合理价格 \$$price | 分析: $snippet';
     Share.share(text);
+  }
+
+  /// "为什么?" — 解释AI为什么做出这个判断
+  void _showWhyExplainer(BuildContext context) {
+    final displayName = _chineseName(symbol);
+    final isUp = direction.toLowerCase() == 'up';
+    final isDown = direction.toLowerCase() == 'down';
+    final dirText = isUp ? '看涨' : isDown ? '看跌' : '观望';
+    final confPct = (confidence * 100).toStringAsFixed(0);
+
+    // 数据来源分析
+    final dataSources = <String>[];
+    if (upProbability != null || downProbability != null) {
+      dataSources.add('多模型概率分布');
+    }
+    dataSources.add('实时价格数据');
+    dataSources.add('技术指标 (RSI/均线/波动率)');
+    if (qualityScore != null && qualityScore! > 0) {
+      dataSources.add('跨市场关联信号');
+    }
+    dataSources.add('恐惧贪婪指数');
+
+    // 偏差检测
+    final biasDetected = biasFlags != null && biasFlags!.isNotEmpty;
+    final hasIntervention = biasFlags?.any((f) => f.hasIntervention) ?? false;
+
+    // 置信度解释
+    String confExplanation;
+    if (confidence >= 0.7) {
+      confExplanation = 'AI有较高把握 ($confPct%)：多个数据源和模型一致支持$dirText判断。';
+    } else if (confidence >= 0.5) {
+      confExplanation = 'AI有中等把握 ($confPct%)：部分指标支持$dirText，但存在不确定性。';
+    } else {
+      confExplanation = 'AI把握较低 ($confPct%)：市场信号混杂，建议谨慎对待。';
+    }
+
+    // 市场环境
+    String regimeText = '';
+    if (regime != null) {
+      regimeText = '当前市场环境: ${regime!.description}';
+    }
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      isScrollControlled: true,
+      builder: (ctx) => Container(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.75,
+        ),
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundOf(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Container(
+                  width: 36,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: AppTheme.divider,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                '为什么AI$dirText $displayName?',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimaryOf(context),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 16),
+
+              // 1. 判断方向原因
+              _whySection(
+                context,
+                icon: Icons.trending_up_rounded,
+                iconColor: isUp ? AppTheme.upGreen : isDown ? AppTheme.downRed : AppTheme.flatGray,
+                title: '判断方向',
+                content: cleanReasoning(reasoning).isNotEmpty
+                    ? cleanReasoning(reasoning)
+                    : 'AI综合分析多项数据后判断$dirText。',
+              ),
+
+              // 2. 数据来源
+              _whySection(
+                context,
+                icon: Icons.storage_rounded,
+                iconColor: AppTheme.primary,
+                title: '使用的数据',
+                content: dataSources.join('、'),
+              ),
+
+              // 3. 置信度
+              _whySection(
+                context,
+                icon: Icons.speed_rounded,
+                iconColor: confidence >= 0.7 ? AppTheme.upGreen
+                    : confidence >= 0.5 ? const Color(0xFFF59E0B) : AppTheme.downRed,
+                title: '置信度分析',
+                content: confExplanation,
+              ),
+
+              // 4. 偏差检测
+              if (biasDetected)
+                _whySection(
+                  context,
+                  icon: Icons.psychology_rounded,
+                  iconColor: const Color(0xFF2196F3),
+                  title: '偏差检测',
+                  content: hasIntervention
+                      ? '系统检测到认知偏差并已自动校准置信度: ${biasFlags!.where((f) => f.hasIntervention).map((f) => f.label).join("、")}。'
+                      : '检测到潜在偏差: ${biasFlags!.map((f) => f.label).join("、")}。暂未触发校准。',
+                ),
+
+              // 5. 市场环境
+              if (regimeText.isNotEmpty)
+                _whySection(
+                  context,
+                  icon: Icons.landscape_rounded,
+                  iconColor: const Color(0xFF8B5CF6),
+                  title: '市场环境',
+                  content: regimeText,
+                ),
+
+              // 6. 概率分布
+              if (upProbability != null && downProbability != null && flatProbability != null)
+                _whySection(
+                  context,
+                  icon: Icons.pie_chart_outline_rounded,
+                  iconColor: const Color(0xFFFF6B00),
+                  title: '概率分布',
+                  content: '看涨${(upProbability! * 100).round()}%  看跌${(downProbability! * 100).round()}%  观望${(flatProbability! * 100).round()}%',
+                ),
+
+              const SizedBox(height: 16),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: AppTheme.surfaceOf(context),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: const Text(
+                  '提示: AI判断仅供参考，不构成投资建议。请结合自己的研究做决策。',
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: AppTheme.textSecondary,
+                    height: 1.4,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _whySection(BuildContext context, {
+    required IconData icon,
+    required Color iconColor,
+    required String title,
+    required String content,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 14),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 32,
+            height: 32,
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Icon(icon, size: 16, color: iconColor),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    fontSize: 13,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimaryOf(context),
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  content,
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    height: 1.5,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   void _showFieldExplanation(BuildContext context) {

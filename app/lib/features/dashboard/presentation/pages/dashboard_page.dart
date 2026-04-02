@@ -1,5 +1,6 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
@@ -117,6 +118,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
         ref.invalidate(overviewStatsProvider);
         ref.invalidate(insightsProvider);
         await ref.read(latestJudgmentsProvider.future);
+        HapticFeedback.lightImpact();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
@@ -1957,6 +1959,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
       downProbability: j.downProbability,
       flatProbability: j.flatProbability,
       biasFlags: j.biasFlags,
+      regime: j.regime,
       isFavorite: isFavorite,
       onToggleFavorite: onToggleFavorite,
       onTap: () {

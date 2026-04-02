@@ -1186,6 +1186,19 @@ class MarketReportCard(BaseModel):
     overall_grade: str = "N/A"        # A/B/C/D/F
 
 
+class ConfidenceTrendItem(BaseModel):
+    confidence_score: float
+    direction: str
+    created_at: str
+
+
+class ConfidenceTrend(BaseModel):
+    history: list[ConfidenceTrendItem] = []
+    trend: str = "稳定"  # "上升" / "下降" / "稳定"
+    avg_recent: float = 0.0
+    avg_older: float = 0.0
+
+
 class MarketStatsResponse(BaseModel):
     symbol: str
     total_judgments: int
@@ -1199,6 +1212,7 @@ class MarketStatsResponse(BaseModel):
     best_regime_accuracy: Optional[float] = None
     regime_breakdown: list[RegimeAccuracy] = []
     report_card: Optional[MarketReportCard] = None
+    confidence_trend: Optional[ConfidenceTrend] = None
 
 
 @router.get("/market-stats/{symbol}", response_model=MarketStatsResponse)
@@ -1344,6 +1358,56 @@ async def get_market_stats(
     except Exception:
         pass
 
+    # ── Confidence Trend ──
+    confidence_trend_data = None
+    try:
+        from backend.models import ConfidenceHistory
+        conf_stmt = (
+            select(ConfidenceHistory)
+            .where(ConfidenceHistory.market_id == market.id)
+            .order_by(desc(ConfidenceHistory.created_at))
+            .limit(10)
+        )
+        conf_result = await session.execute(conf_stmt)
+        conf_rows = conf_result.scalars().all()
+
+        if conf_rows:
+            history_items = [
+                ConfidenceTrendItem(
+                    confidence_score=round(c.confidence_score, 3),
+                    direction=c.direction,
+                    created_at=c.created_at.isoformat() if c.created_at else "",
+                )
+                for c in reversed(conf_rows)  # chronological order
+            ]
+
+            # Detect trend: compare first half vs second half
+            scores = [c.confidence_score for c in conf_rows]
+            if len(scores) >= 4:
+                mid = len(scores) // 2
+                avg_recent = sum(scores[:mid]) / mid  # most recent (desc order)
+                avg_older = sum(scores[mid:]) / (len(scores) - mid)
+                diff = avg_recent - avg_older
+                if diff > 0.05:
+                    trend = "上升"
+                elif diff < -0.05:
+                    trend = "下降"
+                else:
+                    trend = "稳定"
+            else:
+                avg_recent = sum(scores) / len(scores)
+                avg_older = avg_recent
+                trend = "稳定"
+
+            confidence_trend_data = ConfidenceTrend(
+                history=history_items,
+                trend=trend,
+                avg_recent=round(avg_recent, 3),
+                avg_older=round(avg_older, 3),
+            )
+    except Exception:
+        pass
+
     return MarketStatsResponse(
         symbol=symbol,
         total_judgments=total_judgments,
@@ -1357,6 +1421,7 @@ async def get_market_stats(
         best_regime_accuracy=best_regime_accuracy,
         regime_breakdown=regime_breakdown,
         report_card=report_card,
+        confidence_trend=confidence_trend_data,
     )
 
 
