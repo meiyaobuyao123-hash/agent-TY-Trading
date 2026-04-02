@@ -10,6 +10,8 @@ from collections import defaultdict
 from datetime import datetime, timedelta
 from typing import Optional
 
+import httpx
+
 from sqlalchemy import select, desc
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
@@ -24,6 +26,77 @@ from backend.plugins.bias_detectors.cognitive_bias import detect_all_biases
 from backend.plugins.data_sources.fear_greed import get_fear_greed_index
 
 logger = logging.getLogger(__name__)
+
+# ── Crypto market cap ranking cache ──────────────────────────────
+_mcap_cache: dict = {}
+_mcap_cache_ts: float = 0.0
+MCAP_CACHE_TTL = 3600  # 1 hour
+
+
+async def _fetch_crypto_mcap_rankings() -> dict[str, dict]:
+    """Fetch crypto market cap rankings from CoinGecko free API.
+
+    Returns dict mapping symbol (e.g. 'BTC-USD') to {rank, market_cap, tier}.
+    """
+    global _mcap_cache, _mcap_cache_ts
+    now = time.time()
+    if _mcap_cache and (now - _mcap_cache_ts) < MCAP_CACHE_TTL:
+        return _mcap_cache
+
+    # CoinGecko symbol to our symbol mapping
+    coingecko_id_map = {
+        "bitcoin": "BTC-USD", "ethereum": "ETH-USD", "solana": "SOL-USD",
+        "binancecoin": "BNB-USD", "ripple": "XRP-USD", "cardano": "ADA-USD",
+        "dogecoin": "DOGE-USD", "avalanche-2": "AVAX-USD", "polkadot": "DOT-USD",
+        "chainlink": "LINK-USD", "matic-network": "MATIC-USD", "uniswap": "UNI-USD",
+        "cosmos": "ATOM-USD", "litecoin": "LTC-USD", "sui": "SUI-USD",
+        "arbitrum": "ARB-USD", "optimism": "OP-USD", "aptos": "APT-USD",
+        "near": "NEAR-USD", "filecoin": "FIL-USD", "tron": "TRX-USD",
+        "the-open-network": "TON-USD", "shiba-inu": "SHIB-USD",
+        "pepe": "PEPE-USD", "aave": "AAVE-USD",
+    }
+
+    try:
+        async with httpx.AsyncClient(timeout=15) as client:
+            resp = await client.get(
+                "https://api.coingecko.com/api/v3/coins/markets",
+                params={
+                    "vs_currency": "usd",
+                    "order": "market_cap_desc",
+                    "per_page": 100,
+                    "page": 1,
+                },
+            )
+            if resp.status_code == 200:
+                data = resp.json()
+                result = {}
+                for coin in data:
+                    cg_id = coin.get("id", "")
+                    our_sym = coingecko_id_map.get(cg_id)
+                    if our_sym:
+                        rank = coin.get("market_cap_rank", 999)
+                        if rank <= 10:
+                            tier = "前10"
+                        elif rank <= 30:
+                            tier = "前30"
+                        elif rank <= 50:
+                            tier = "前50"
+                        elif rank <= 100:
+                            tier = "前100"
+                        else:
+                            tier = "100名后"
+                        result[our_sym] = {
+                            "rank": rank,
+                            "market_cap": coin.get("market_cap"),
+                            "tier": tier,
+                        }
+                _mcap_cache = result
+                _mcap_cache_ts = now
+                return result
+    except Exception:
+        logger.debug("Failed to fetch CoinGecko market cap rankings")
+
+    return _mcap_cache  # Return stale cache if available
 
 # Map market_type to data source plugin name
 DATA_SOURCE_MAP = {
@@ -88,15 +161,122 @@ def _build_history_text(candles: list) -> str:
     return " → ".join(prices)
 
 
+def _compute_technical_indicators(candles: list) -> dict:
+    """Compute technical indicators from historical candles.
+
+    Returns dict with:
+      - rsi_7: 7-period RSI (0-100)
+      - change_7d_pct: 7-day price change percentage
+      - sma_7_trend: 'above' or 'below' (current price vs 7-day SMA)
+      - volatility_7d: 7-day price volatility (std dev of daily returns)
+    """
+    if not candles or len(candles) < 3:
+        return {}
+
+    closes = [c.close for c in candles if c.close is not None]
+    if len(closes) < 3:
+        return {}
+
+    result = {}
+
+    # 7-day price change %
+    recent = closes[-7:] if len(closes) >= 7 else closes
+    if len(recent) >= 2 and recent[0] != 0:
+        result["change_7d_pct"] = round((recent[-1] - recent[0]) / recent[0] * 100, 2)
+
+    # 7-day SMA
+    sma_7 = sum(recent) / len(recent)
+    current_price = closes[-1]
+    result["sma_7"] = round(sma_7, 4)
+    result["sma_7_trend"] = "above" if current_price > sma_7 else "below"
+
+    # RSI(7) — Relative Strength Index
+    if len(closes) >= 8:
+        rsi_data = closes[-(min(14, len(closes))):]  # Use up to 14 periods
+        gains = []
+        losses = []
+        for i in range(1, len(rsi_data)):
+            delta = rsi_data[i] - rsi_data[i - 1]
+            if delta > 0:
+                gains.append(delta)
+                losses.append(0)
+            else:
+                gains.append(0)
+                losses.append(abs(delta))
+        if gains:
+            avg_gain = sum(gains[-7:]) / 7
+            avg_loss = sum(losses[-7:]) / 7
+            if avg_loss == 0:
+                result["rsi_7"] = 100.0
+            else:
+                rs = avg_gain / avg_loss
+                result["rsi_7"] = round(100 - (100 / (1 + rs)), 1)
+
+    # 7-day volatility (annualized std dev of daily returns)
+    if len(recent) >= 3:
+        daily_returns = []
+        for i in range(1, len(recent)):
+            if recent[i - 1] != 0:
+                daily_returns.append((recent[i] - recent[i - 1]) / recent[i - 1])
+        if daily_returns:
+            mean_ret = sum(daily_returns) / len(daily_returns)
+            variance = sum((r - mean_ret) ** 2 for r in daily_returns) / len(daily_returns)
+            result["volatility_7d"] = round((variance ** 0.5) * 100, 2)  # as percentage
+
+    return result
+
+
+def _format_technical_indicators(indicators: dict) -> str:
+    """Format technical indicators as a Chinese-language string for AI prompt."""
+    if not indicators:
+        return ""
+
+    parts = []
+
+    rsi = indicators.get("rsi_7")
+    if rsi is not None:
+        if rsi >= 70:
+            rsi_label = "超买"
+        elif rsi <= 30:
+            rsi_label = "超卖"
+        else:
+            rsi_label = "中性"
+        parts.append(f"RSI(7)={rsi:.0f}({rsi_label})")
+
+    change_7d = indicators.get("change_7d_pct")
+    if change_7d is not None:
+        parts.append(f"7日涨幅={change_7d:+.1f}%")
+
+    sma_trend = indicators.get("sma_7_trend")
+    if sma_trend:
+        trend_cn = "高于" if sma_trend == "above" else "低于"
+        parts.append(f"价格{trend_cn}7日均线")
+
+    vol = indicators.get("volatility_7d")
+    if vol is not None:
+        if vol > 3:
+            vol_label = "高波动"
+        elif vol > 1.5:
+            vol_label = "中等波动"
+        else:
+            vol_label = "低波动"
+        parts.append(f"7日波动率={vol:.1f}%({vol_label})")
+
+    return "技术指标: " + ", ".join(parts) if parts else ""
+
+
 async def _fetch_history_for_market(
     data_source,
     symbol: str,
     market_type_str: str,
-) -> str:
-    """Fetch last 7 daily candles for a symbol and return formatted history text."""
+) -> tuple[str, dict]:
+    """Fetch last 7+ daily candles for a symbol.
+
+    Returns (history_text, technical_indicators_dict).
+    """
     try:
         now_ms = int(time.time() * 1000)
-        start_ms = now_ms - (10 * 24 * 3600 * 1000)  # 10 days back for safety
+        start_ms = now_ms - (15 * 24 * 3600 * 1000)  # 15 days back for RSI
         mt_enum = _MARKET_TYPE_ENUM.get(market_type_str, MarketType.CRYPTO)
         query = DataQuery(
             symbols=[symbol],
@@ -107,10 +287,13 @@ async def _fetch_history_for_market(
         )
         results = await data_source.fetch(query)
         if results and results[0].candles:
-            return _build_history_text(results[0].candles)
+            candles = results[0].candles
+            history_text = _build_history_text(candles)
+            tech_indicators = _compute_technical_indicators(candles)
+            return history_text, tech_indicators
     except Exception:
         logger.debug("Failed to fetch history for %s — will proceed without", symbol)
-    return ""
+    return "", {}
 
 
 async def _build_market_context(
@@ -216,10 +399,11 @@ async def _process_single_market(
             logger.warning("Skipping AI judgment for %s — no price data", market.symbol)
             return None
 
-        # 3. Fetch historical data for AI context
+        # 3. Fetch historical data for AI context + technical indicators
         history_text = ""
+        tech_indicators = {}
         if data_source:
-            history_text = await _fetch_history_for_market(
+            history_text, tech_indicators = await _fetch_history_for_market(
                 data_source, market.symbol, market.market_type
             )
 
@@ -279,16 +463,32 @@ async def _process_single_market(
             logger.debug("Failed to load strategy genome for %s", market.symbol)
 
         # 4e. AI consensus
+        # 4f. Format technical indicators text
+        tech_text = _format_technical_indicators(tech_indicators)
+
+        # 4g. Crypto market cap ranking
+        mcap_text = ""
+        if market.market_type == "crypto":
+            try:
+                mcap_data = await _fetch_crypto_mcap_rankings()
+                coin_mcap = mcap_data.get(market.symbol)
+                if coin_mcap:
+                    mcap_text = f"该币种市值排名: 第{coin_mcap['rank']}名 ({coin_mcap['tier']})"
+            except Exception:
+                logger.debug("Failed to get mcap for %s", market.symbol)
+
         context = {
             "symbol": market.symbol,
             "market_data": tick_data,
             "horizon_hours": market_horizon,
             "history_text": history_text,
+            "tech_indicators_text": tech_text,
             "last_judgment": last_judgment_ctx,
             "market_context": market_context if market_context else None,
             "fear_greed": fear_greed_ctx,
             "market_breadth": market_breadth_ctx,
             "genome_hint": genome_hint,
+            "mcap_text": mcap_text,
         }
         ai_result = await reasoning.analyze(context)
 
@@ -359,7 +559,10 @@ async def _process_single_market(
                 if accuracy > 70:
                     calibrated_confidence = min(1.0, raw_confidence * 1.1)
                 elif accuracy < 40:
-                    calibrated_confidence = raw_confidence * 0.7
+                    # Gentle dampening — don't crush confidence too much
+                    # Map accuracy 0-40% to multiplier 0.8-1.0
+                    dampen_factor = 0.8 + (accuracy / 40.0) * 0.2
+                    calibrated_confidence = raw_confidence * dampen_factor
                 logger.info(
                     "Confidence calibration for %s (%s): %.2f -> %.2f (accuracy=%.1f%%)",
                     market.symbol, market.market_type, raw_confidence,

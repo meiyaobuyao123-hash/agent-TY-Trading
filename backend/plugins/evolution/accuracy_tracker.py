@@ -27,7 +27,7 @@ logger = logging.getLogger(__name__)
 # If actual price moves less than this, actual_direction = "flat".
 # More volatile markets need a wider threshold; stable markets a tighter one.
 FLAT_THRESHOLD_PCT: dict[str, float] = {
-    "crypto": 1.0,          # crypto is volatile; 1% in 4h is noise
+    "crypto": 1.5,          # crypto is volatile; 1.5% in 4h is noise (was 1.0, too tight)
     "us-equities": 0.5,     # stocks: 0.5% in 24h is noise
     "cn-equities": 0.5,
     "hk-equities": 0.5,
@@ -36,6 +36,7 @@ FLAT_THRESHOLD_PCT: dict[str, float] = {
     "forex": 0.15,           # forex moves are tiny; 0.15% is already noise
     "macro": 0.1,
     "prediction-markets": 1.0,
+    "etf": 0.4,
 }
 DEFAULT_FLAT_THRESHOLD = 0.5
 
@@ -145,12 +146,29 @@ async def settle_judgments(session: AsyncSession) -> int:
             else:
                 is_correct = j.direction == actual_direction
 
+            # Compute Brier score from probability calibration (R14)
+            # Brier = mean((predicted_prob - actual_outcome)^2) for each class
+            brier_score = None
+            up_prob = j.up_probability or 0.33
+            down_prob = j.down_probability or 0.33
+            flat_prob = j.flat_probability or 0.34
+            actual_up = 1.0 if actual_direction == "up" else 0.0
+            actual_down = 1.0 if actual_direction == "down" else 0.0
+            actual_flat = 1.0 if actual_direction == "flat" else 0.0
+            brier_score = round(
+                ((up_prob - actual_up) ** 2
+                 + (down_prob - actual_down) ** 2
+                 + (flat_prob - actual_flat) ** 2) / 3.0,
+                4,
+            )
+
             settlement = Settlement(
                 id=uuid.uuid4(),
                 judgment_id=j.id,
                 actual_price=actual_price,
                 actual_direction=actual_direction,
                 is_correct=is_correct,
+                brier_score=brier_score,
                 settled_at=now,
             )
             session.add(settlement)
@@ -247,21 +265,40 @@ async def recalculate_accuracy(session: AsyncSession) -> int:
                 cc = conf_row[1] or 0
                 conf_accuracies[conf_level] = (cc / ct * 100) if ct > 0 else None
 
-            # Calibration error: |predicted_confidence - actual_accuracy|
-            avg_conf_stmt = (
-                select(func.avg(Judgment.confidence_score))
-                .join(Settlement, Settlement.judgment_id == Judgment.id)
+            # Calibration error: average Brier score (R14 — probability-based)
+            brier_stmt = (
+                select(func.avg(Settlement.brier_score))
+                .join(Judgment, Judgment.id == Settlement.judgment_id)
                 .join(Market, Market.id == Judgment.market_id)
                 .where(
                     and_(
                         Market.market_type == mt,
                         Settlement.settled_at >= cutoff,
+                        Settlement.brier_score.isnot(None),
                     )
                 )
             )
-            avg_conf_result = await session.execute(avg_conf_stmt)
-            avg_conf = avg_conf_result.scalar() or 0.5
-            calibration_err = abs(avg_conf * 100 - accuracy) if total > 0 else 0.0
+            brier_result = await session.execute(brier_stmt)
+            avg_brier = brier_result.scalar()
+
+            # Fall back to old method if no Brier data yet
+            if avg_brier is not None:
+                calibration_err = round(avg_brier * 100, 2)  # Scale to 0-100 for display
+            else:
+                avg_conf_stmt = (
+                    select(func.avg(Judgment.confidence_score))
+                    .join(Settlement, Settlement.judgment_id == Judgment.id)
+                    .join(Market, Market.id == Judgment.market_id)
+                    .where(
+                        and_(
+                            Market.market_type == mt,
+                            Settlement.settled_at >= cutoff,
+                        )
+                    )
+                )
+                avg_conf_result = await session.execute(avg_conf_stmt)
+                avg_conf = avg_conf_result.scalar() or 0.5
+                calibration_err = abs(avg_conf * 100 - accuracy) if total > 0 else 0.0
 
             stat = AccuracyStat(
                 id=uuid.uuid4(),

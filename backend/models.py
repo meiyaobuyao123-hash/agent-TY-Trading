@@ -127,6 +127,7 @@ class Settlement(Base):
     actual_price = Column(Float, nullable=True)
     actual_direction = Column(String(10), nullable=True)
     is_correct = Column(Boolean, nullable=True)
+    brier_score = Column(Float, nullable=True)  # R14: probability calibration score (lower=better)
     settled_at = Column(DateTime, default=datetime.utcnow)
 
     judgment = relationship("Judgment", back_populates="settlement", lazy="selectin")
