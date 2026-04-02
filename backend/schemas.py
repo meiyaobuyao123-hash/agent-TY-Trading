@@ -13,7 +13,7 @@ from pydantic import BaseModel, Field
 
 class HealthResponse(BaseModel):
     status: str = "ok"
-    version: str = "0.1.0"
+    version: str = "2.1.0"
     plugins: dict[str, dict[str, bool]] = {}
 
 

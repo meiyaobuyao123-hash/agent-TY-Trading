@@ -8,7 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/services/favorites_service.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../shared/models/judgment.dart';
-import '../../../../shared/widgets/error_widget.dart';
+import '../../../../shared/widgets/error_widget.dart' show AppErrorWidget, SafeSection;
 import '../../../../shared/widgets/loading_widget.dart';
 import '../../../../shared/widgets/metric_card.dart';
 import '../../../../shared/widgets/signal_card.dart';
@@ -156,7 +156,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                   SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'AI每4小时分析全球250+市场，给出方向判断和合理价格估值',
+                      'AI每4小时分析全球340+市场，给出方向判断和合理价格估值',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -185,7 +185,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                   Text('\u{1F3AF}', style: TextStyle(fontSize: 12)),
                   SizedBox(width: 4),
                   Text(
-                    '\u5df2\u8986\u76d6250+\u5168\u7403\u5e02\u573a',
+                    '\u5df2\u8986\u76d6340+\u5168\u7403\u5e02\u573a',
                     style: TextStyle(
                       fontSize: 11,
                       color: Colors.white,
@@ -319,13 +319,25 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
         ),
         if (_showDetailSections) ...[
           const SizedBox(height: 16),
-          _buildEvolutionSection(ref),
+          SafeSection(
+            fallbackMessage: 'AI进化模块加载异常',
+            builder: () => _buildEvolutionSection(ref),
+          ),
           const SizedBox(height: 16),
-          _buildDiscoveriesSection(ref),
+          SafeSection(
+            fallbackMessage: 'AI发现模块加载异常',
+            builder: () => _buildDiscoveriesSection(ref),
+          ),
           const SizedBox(height: 16),
-          _buildHighlightsSection(ref),
+          SafeSection(
+            fallbackMessage: '今日亮点模块加载异常',
+            builder: () => _buildHighlightsSection(ref),
+          ),
           const SizedBox(height: 12),
-          _buildInsightsSection(ref),
+          SafeSection(
+            fallbackMessage: 'AI洞察模块加载异常',
+            builder: () => _buildInsightsSection(ref),
+          ),
         ],
       ],
     );
@@ -1118,14 +1130,20 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     final hasMore = validList.length > _initialSignalCount && !_showAllSignals;
 
     final cards = displayList
-        .map((j) => Padding(
+        .map((j) {
+          try {
+            return Padding(
               padding: const EdgeInsets.only(bottom: 10),
               child: _buildSignalCard(context, j,
                   isFavorite: favorites.contains(j.symbol),
                   onToggleFavorite: () {
                     ref.read(favoritesProvider.notifier).toggle(j.symbol ?? '');
                   }),
-            ))
+            );
+          } catch (_) {
+            return const SizedBox.shrink();
+          }
+        })
         .toList();
 
     if (hasMore) {

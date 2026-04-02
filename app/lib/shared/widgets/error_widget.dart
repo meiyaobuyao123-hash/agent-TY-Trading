@@ -34,6 +34,50 @@ String friendlyErrorMessage(Object error) {
   return '加载失败，请稍后再试';
 }
 
+/// Error boundary wrapper — catches rendering errors in a section and shows
+/// a placeholder instead of crashing the whole page.
+class SafeSection extends StatelessWidget {
+  final Widget Function() builder;
+  final String fallbackMessage;
+
+  const SafeSection({
+    super.key,
+    required this.builder,
+    this.fallbackMessage = '该模块加载异常',
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    try {
+      return builder();
+    } catch (e) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: AppTheme.surface,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            const Icon(Icons.info_outline_rounded,
+                size: 16, color: AppTheme.textSecondary),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(
+                fallbackMessage,
+                style: const TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+            ),
+          ],
+        ),
+      );
+    }
+  }
+}
+
 /// Error display with retry button.
 class AppErrorWidget extends StatelessWidget {
   final String message;

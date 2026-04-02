@@ -8,7 +8,7 @@ import '../../../../shared/models/judgment.dart';
 import '../../../../shared/models/market_snapshot.dart';
 import '../../../../shared/widgets/confidence_bar.dart';
 import '../../../../shared/widgets/direction_badge.dart';
-import '../../../../shared/widgets/error_widget.dart';
+import '../../../../shared/widgets/error_widget.dart' show AppErrorWidget, SafeSection;
 import '../../../../shared/widgets/loading_widget.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/market_detail_provider.dart';
@@ -221,10 +221,16 @@ class MarketDetailPage extends ConsumerWidget {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             // Market accuracy stat
-                            _buildMarketAccuracy(judgments),
+                            SafeSection(
+                              fallbackMessage: '准确率统计加载异常',
+                              builder: () => _buildMarketAccuracy(judgments),
+                            ),
                             const SizedBox(height: 20),
                             // Section 1: AI最新判断
-                            _buildAIAnalysisSection(context, judgments.first),
+                            SafeSection(
+                              fallbackMessage: 'AI分析模块加载异常',
+                              builder: () => _buildAIAnalysisSection(context, judgments.first),
+                            ),
                           ],
                         );
                       },
@@ -239,8 +245,10 @@ class MarketDetailPage extends ConsumerWidget {
                     child: judgmentsAsync.when(
                       loading: () => const SizedBox.shrink(),
                       error: (_, _) => const SizedBox.shrink(),
-                      data: (judgments) =>
-                          _buildAccuracyTrendChart(judgments),
+                      data: (judgments) => SafeSection(
+                        fallbackMessage: '准确率趋势加载异常',
+                        builder: () => _buildAccuracyTrendChart(judgments),
+                      ),
                     ),
                   ),
                 ),
@@ -249,7 +257,10 @@ class MarketDetailPage extends ConsumerWidget {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                    child: _buildPriceChartSection(ref),
+                    child: SafeSection(
+                      fallbackMessage: '价格走势加载异常',
+                      builder: () => _buildPriceChartSection(ref),
+                    ),
                   ),
                 ),
 
@@ -257,7 +268,10 @@ class MarketDetailPage extends ConsumerWidget {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                    child: _buildMarketStatsSection(context, ref),
+                    child: SafeSection(
+                      fallbackMessage: '市场统计加载异常',
+                      builder: () => _buildMarketStatsSection(context, ref),
+                    ),
                   ),
                 ),
 
@@ -265,7 +279,10 @@ class MarketDetailPage extends ConsumerWidget {
                 SliverToBoxAdapter(
                   child: Padding(
                     padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
-                    child: _buildRelatedMarketsSection(ref),
+                    child: SafeSection(
+                      fallbackMessage: '相关市场加载异常',
+                      builder: () => _buildRelatedMarketsSection(ref),
+                    ),
                   ),
                 ),
 
@@ -278,7 +295,10 @@ class MarketDetailPage extends ConsumerWidget {
                       error: (_, _) => const SizedBox.shrink(),
                       data: (judgments) {
                         if (judgments.isEmpty) return const SizedBox.shrink();
-                        return _buildHistorySection(context, judgments);
+                        return SafeSection(
+                          fallbackMessage: '历史判断加载异常',
+                          builder: () => _buildHistorySection(context, judgments),
+                        );
                       },
                     ),
                   ),
