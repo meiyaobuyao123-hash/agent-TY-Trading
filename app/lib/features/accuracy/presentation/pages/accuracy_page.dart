@@ -891,15 +891,15 @@ class _BrierScoreSection extends ConsumerWidget {
                   color: AppTheme.primary.withValues(alpha: 0.06),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(Icons.info_outline_rounded,
+                    const Icon(Icons.info_outline_rounded,
                         size: 13, color: AppTheme.primary),
-                    SizedBox(width: 6),
+                    const SizedBox(width: 6),
                     Expanded(
                       child: Text(
-                        'Brier分数衡量概率预测的校准质量。0=完美，0.25=随机猜测。',
-                        style: TextStyle(
+                        'Brier分数衡量预测概率的精准度。0=完美预测，0.25=随机猜测。当前${brierScore.toStringAsFixed(2)}，${brierScore < 0.25 ? "优于随机" : "需要改进"}。分数越低说明AI对涨跌概率的判断越准确。',
+                        style: const TextStyle(
                           fontSize: 11,
                           color: AppTheme.textSecondary,
                           height: 1.4,

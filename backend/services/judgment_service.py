@@ -25,6 +25,7 @@ from backend.core.market_regime import detect_regime, format_regime_for_prompt, 
 from backend.models import Judgment, Market, MarketSnapshot, Settlement, AccuracyStat
 from backend.core.strategy_genome import get_best_genome, build_genome_prompt_hint
 from backend.core.meta_learner import analyze_success_patterns, build_meta_insight_prompt
+from backend.core.sectors import get_sector, compute_sector_performance, build_sector_prompt_context
 from backend.plugins.bias_detectors.deviation_calc import calculate_deviation_pct
 from backend.plugins.bias_detectors.cognitive_bias import detect_all_biases
 from backend.plugins.data_sources.fear_greed import get_fear_greed_index
@@ -588,6 +589,21 @@ async def _process_single_market(
         except Exception:
             logger.debug("Failed regime detection for %s", market.symbol)
 
+        # 4k. Sector performance context (for equities)
+        sector_text = ""
+        if market.market_type in ("us-equities", "cn-equities", "hk-equities"):
+            try:
+                sector_snapshots = {
+                    sym: data.get("change_pct")
+                    for sym, data in tick_cache.items()
+                    if isinstance(data, dict) and get_sector(sym)
+                }
+                if sector_snapshots:
+                    sector_perf = compute_sector_performance(sector_snapshots)
+                    sector_text = build_sector_prompt_context(market.symbol, sector_perf)
+            except Exception:
+                logger.debug("Failed sector context for %s", market.symbol)
+
         context = {
             "symbol": market.symbol,
             "market_data": tick_data,
@@ -604,6 +620,7 @@ async def _process_single_market(
             "macro_text": macro_text,
             "regime_text": regime_text,
             "meta_insight_hint": meta_insight_hint,
+            "sector_text": sector_text,
         }
         ai_result = await reasoning.analyze(context)
 

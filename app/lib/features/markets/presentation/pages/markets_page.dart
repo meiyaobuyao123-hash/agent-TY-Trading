@@ -76,7 +76,8 @@ class _MarketsPageState extends ConsumerState<MarketsPage>
     '\u{1F30D} 全球': ['forex', 'commodities', 'global-indices', 'crypto', 'macro', 'prediction-markets', 'latam-equities', 'mena-equities'],
   };
 
-  bool _groupByRegion = false;
+  // 0 = by type, 1 = by region, 2 = by sector
+  int _viewMode = 0;
   String? _selectedFilter;
   String _searchQuery = '';
   final List<Market> _compareSelection = [];
@@ -166,9 +167,9 @@ class _MarketsPageState extends ConsumerState<MarketsPage>
           .toList();
     }
 
-    // Group by market type or region
+    // Group by market type, region, or sector
     final grouped = <String, List<Market>>{};
-    if (_groupByRegion) {
+    if (_viewMode == 1) {
       for (final entry in _regionGroups.entries) {
         final regionLabel = entry.key;
         final types = entry.value;
@@ -292,55 +293,45 @@ class _MarketsPageState extends ConsumerState<MarketsPage>
             ),
           ),
 
-          // Toggle: 按类型 / 按地区
+          // Toggle: 按类型 / 按地区 / 按板块
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 4, 20, 4),
               child: Row(
                 children: [
-                  GestureDetector(
-                    onTap: () => setState(() => _groupByRegion = !_groupByRegion),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                      decoration: BoxDecoration(
-                        color: _groupByRegion
-                            ? AppTheme.primary.withValues(alpha: 0.1)
-                            : AppTheme.surfaceOf(context),
-                        borderRadius: BorderRadius.circular(16),
-                        border: Border.all(
-                          color: _groupByRegion
-                              ? AppTheme.primary.withValues(alpha: 0.3)
-                              : Colors.transparent,
-                        ),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(
-                            _groupByRegion ? Icons.public_rounded : Icons.category_rounded,
-                            size: 14,
-                            color: _groupByRegion ? AppTheme.primary : AppTheme.textSecondaryOf(context),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            _groupByRegion ? '按地区' : '按类型',
-                            style: TextStyle(
-                              fontSize: 12,
-                              fontWeight: FontWeight.w500,
-                              color: _groupByRegion ? AppTheme.primary : AppTheme.textSecondaryOf(context),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                  _ViewModeChip(
+                    label: '按类型',
+                    icon: Icons.category_rounded,
+                    isSelected: _viewMode == 0,
+                    onTap: () => setState(() => _viewMode = 0),
+                  ),
+                  const SizedBox(width: 8),
+                  _ViewModeChip(
+                    label: '按地区',
+                    icon: Icons.public_rounded,
+                    isSelected: _viewMode == 1,
+                    onTap: () => setState(() => _viewMode = 1),
+                  ),
+                  const SizedBox(width: 8),
+                  _ViewModeChip(
+                    label: '按板块',
+                    icon: Icons.pie_chart_outline_rounded,
+                    isSelected: _viewMode == 2,
+                    onTap: () => setState(() => _viewMode = 2),
                   ),
                 ],
               ),
             ),
           ),
 
+          // Sector view (R29)
+          if (_viewMode == 2)
+            SliverToBoxAdapter(
+              child: _SectorPerformanceView(),
+            ),
+
           // Global view summary (when region view active + "全部")
-          if (_groupByRegion && _selectedFilter == null)
+          if (_viewMode == 1 && _selectedFilter == null)
             SliverToBoxAdapter(
               child: _GlobalViewSummary(),
             ),
@@ -630,6 +621,341 @@ class _MarketRow extends StatelessWidget {
     if (price >= 1000) return price.toStringAsFixed(0);
     if (price >= 1) return price.toStringAsFixed(2);
     return price.toStringAsFixed(4);
+  }
+}
+
+/// View mode chip button.
+class _ViewModeChip extends StatelessWidget {
+  final String label;
+  final IconData icon;
+  final bool isSelected;
+  final VoidCallback onTap;
+
+  const _ViewModeChip({
+    required this.label,
+    required this.icon,
+    required this.isSelected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: isSelected
+              ? AppTheme.primary.withValues(alpha: 0.1)
+              : AppTheme.surfaceOf(context),
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: isSelected
+                ? AppTheme.primary.withValues(alpha: 0.3)
+                : Colors.transparent,
+          ),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(
+              icon,
+              size: 14,
+              color: isSelected ? AppTheme.primary : AppTheme.textSecondaryOf(context),
+            ),
+            const SizedBox(width: 4),
+            Text(
+              label,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w500,
+                color: isSelected ? AppTheme.primary : AppTheme.textSecondaryOf(context),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// Sector performance view (R29) — shows sector cards for US stocks.
+class _SectorPerformanceView extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final sectorsAsync = ref.watch(sectorPerformanceProvider);
+
+    return sectorsAsync.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+        child: Container(
+          height: 60,
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+      ),
+      error: (_, _) => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+        child: Container(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: Text(
+            '板块数据加载失败',
+            style: TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondaryOf(context),
+            ),
+          ),
+        ),
+      ),
+      data: (sectors) {
+        if (sectors.isEmpty) {
+          return Padding(
+            padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+            child: Container(
+              padding: const EdgeInsets.all(14),
+              decoration: BoxDecoration(
+                color: AppTheme.surfaceOf(context),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Text(
+                '暂无板块数据',
+                style: TextStyle(
+                  fontSize: 13,
+                  color: AppTheme.textSecondaryOf(context),
+                ),
+              ),
+            ),
+          );
+        }
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Header
+              Row(
+                children: [
+                  Icon(Icons.pie_chart_outline_rounded, size: 14,
+                      color: AppTheme.primary),
+                  const SizedBox(width: 6),
+                  Text(
+                    '美股板块表现',
+                    style: TextStyle(
+                      fontSize: 13,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              // Sector summary row (horizontal scroll)
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: sectors.map((s) {
+                    final sectorName = s['sector'] as String? ?? '';
+                    final avgChange = (s['avg_change'] as num?)?.toDouble() ?? 0.0;
+                    final trend = s['trend'] as String? ?? '';
+
+                    Color changeColor;
+                    if (avgChange > 0.3) {
+                      changeColor = AppTheme.upGreen;
+                    } else if (avgChange < -0.3) {
+                      changeColor = AppTheme.downRed;
+                    } else {
+                      changeColor = AppTheme.flatGray;
+                    }
+
+                    return Padding(
+                      padding: const EdgeInsets.only(right: 8),
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 14, vertical: 10),
+                        decoration: BoxDecoration(
+                          color: AppTheme.cardColorOf(context),
+                          borderRadius: BorderRadius.circular(12),
+                          border: Border.all(
+                            color: changeColor.withValues(alpha: 0.2),
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: const Color(0xFF000000)
+                                  .withValues(alpha: 0.03),
+                              blurRadius: 4,
+                              offset: const Offset(0, 1),
+                            ),
+                          ],
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              sectorName,
+                              style: TextStyle(
+                                fontSize: 14,
+                                fontWeight: FontWeight.w600,
+                                color: AppTheme.textPrimaryOf(context),
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Text(
+                                  '${avgChange >= 0 ? "+" : ""}${avgChange.toStringAsFixed(2)}%',
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    fontWeight: FontWeight.w700,
+                                    color: changeColor,
+                                    fontFeatures: const [
+                                      FontFeature.tabularFigures()
+                                    ],
+                                  ),
+                                ),
+                                const SizedBox(width: 6),
+                                Text(
+                                  trend,
+                                  style: TextStyle(
+                                    fontSize: 11,
+                                    color: changeColor,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
+
+              // Detailed sector cards
+              const SizedBox(height: 12),
+              ...sectors.map((s) {
+                final sectorName = s['sector'] as String? ?? '';
+                final avgChange = (s['avg_change'] as num?)?.toDouble() ?? 0.0;
+                final trend = s['trend'] as String? ?? '';
+                final up = s['up'] as int? ?? 0;
+                final down = s['down'] as int? ?? 0;
+                final total = s['total'] as int? ?? 0;
+                final symbols = (s['symbols'] as List<dynamic>?)?.cast<String>() ?? [];
+
+                Color changeColor;
+                if (avgChange > 0.3) {
+                  changeColor = AppTheme.upGreen;
+                } else if (avgChange < -0.3) {
+                  changeColor = AppTheme.downRed;
+                } else {
+                  changeColor = AppTheme.flatGray;
+                }
+
+                return Container(
+                  margin: const EdgeInsets.only(bottom: 8),
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: AppTheme.cardColorOf(context),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: const Color(0xFF000000)
+                            .withValues(alpha: 0.03),
+                        blurRadius: 4,
+                        offset: const Offset(0, 1),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            sectorName,
+                            style: TextStyle(
+                              fontSize: 15,
+                              fontWeight: FontWeight.w600,
+                              color: AppTheme.textPrimaryOf(context),
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 8, vertical: 3),
+                            decoration: BoxDecoration(
+                              color: changeColor.withValues(alpha: 0.1),
+                              borderRadius: BorderRadius.circular(6),
+                            ),
+                            child: Text(
+                              '${avgChange >= 0 ? "+" : ""}${avgChange.toStringAsFixed(2)}%',
+                              style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: changeColor,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 6),
+                          Text(
+                            trend,
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: changeColor,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const Spacer(),
+                          Text(
+                            '涨$up 跌$down/$total',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondaryOf(context),
+                            ),
+                          ),
+                        ],
+                      ),
+                      if (symbols.isNotEmpty) ...[
+                        const SizedBox(height: 8),
+                        Wrap(
+                          spacing: 6,
+                          runSpacing: 4,
+                          children: symbols.map((sym) {
+                            return Text(
+                              sym,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: AppTheme.textSecondaryOf(context),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            );
+                          }).toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                );
+              }),
+            ],
+          ),
+        );
+      },
+    );
   }
 }
 

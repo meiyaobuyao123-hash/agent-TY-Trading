@@ -20,3 +20,13 @@ final globalViewProvider = FutureProvider<Map<String, dynamic>>((ref) async {
   final response = await dio.get('/stats/global-view');
   return response.data as Map<String, dynamic>;
 });
+
+/// Sector performance data (R29).
+final sectorPerformanceProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final response = await dio.get('/stats/sector-performance');
+  final data = response.data as Map<String, dynamic>;
+  final sectors = data['sectors'] as List<dynamic>? ?? [];
+  return sectors.cast<Map<String, dynamic>>();
+});

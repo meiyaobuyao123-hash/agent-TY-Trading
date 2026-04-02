@@ -1630,3 +1630,158 @@ async def get_calibration_diagnostics_endpoint(
     from backend.services.calibration_service import get_calibration_diagnostics
     diagnostics = await get_calibration_diagnostics(session)
     return {"diagnostics": diagnostics}
+
+
+# ── 板块表现 (R29) ─────────────────────────────────────────────────
+
+
+@router.get("/sector-performance")
+async def get_sector_performance(
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """返回各板块的平均表现 — 用于板块视图和AI板块上下文。"""
+    from backend.core.sectors import SECTORS, compute_sector_performance
+
+    # Get latest snapshot per market with change_pct
+    latest_snap_sub = (
+        select(
+            MarketSnapshot.market_id,
+            func.max(MarketSnapshot.captured_at).label("max_at"),
+        )
+        .group_by(MarketSnapshot.market_id)
+        .subquery()
+    )
+    snap_stmt = (
+        select(MarketSnapshot.change_pct, Market.symbol)
+        .join(
+            latest_snap_sub,
+            and_(
+                MarketSnapshot.market_id == latest_snap_sub.c.market_id,
+                MarketSnapshot.captured_at == latest_snap_sub.c.max_at,
+            ),
+        )
+        .join(Market, Market.id == MarketSnapshot.market_id)
+        .where(
+            Market.is_active == True,
+            Market.market_type == "us-equities",
+            MarketSnapshot.change_pct.isnot(None),
+        )
+    )
+    snap_result = await session.execute(snap_stmt)
+    snapshots = {row[1]: row[0] for row in snap_result.all()}
+
+    sector_perf = compute_sector_performance(snapshots)
+
+    sectors_list = []
+    for sector_name, perf in sorted(sector_perf.items(), key=lambda x: x[1]["avg_change"], reverse=True):
+        symbols_in_sector = [s for s in snapshots if SECTORS.get(s) == sector_name]
+        sectors_list.append({
+            "sector": sector_name,
+            "avg_change": perf["avg_change"],
+            "trend": perf["trend"],
+            "up": perf["up"],
+            "down": perf["down"],
+            "total": perf["total"],
+            "symbols": symbols_in_sector,
+        })
+
+    return {"sectors": sectors_list}
+
+
+# ── 关注列表提醒 (R29) ─────────────────────────────────────────────
+
+
+class WatchlistAlert(BaseModel):
+    symbol: str
+    alert_type: str  # "direction_change" | "high_confidence" | "large_deviation"
+    title: str
+    detail: str
+    timestamp: str
+
+
+@router.get("/watchlist-alerts")
+async def get_watchlist_alerts(
+    symbols: str = Query(..., description="逗号分隔的关注品种列表"),
+    session: AsyncSession = Depends(get_session),
+) -> dict:
+    """返回用户关注市场的个性化提醒 — 方向变化/高置信信号/大偏差。"""
+    symbol_list = [s.strip() for s in symbols.split(",") if s.strip()]
+    if not symbol_list:
+        return {"alerts": []}
+
+    cutoff = datetime.utcnow() - timedelta(hours=24)
+    alerts: list[dict] = []
+
+    # Fetch markets for these symbols
+    market_stmt = select(Market).where(Market.symbol.in_(symbol_list))
+    market_result = await session.execute(market_stmt)
+    markets = {m.symbol: m for m in market_result.scalars().all()}
+
+    if not markets:
+        return {"alerts": []}
+
+    market_ids = {m.id: m.symbol for m in markets.values()}
+
+    # Fetch recent judgments for these markets (last 24h)
+    recent_stmt = (
+        select(Judgment, Market.symbol)
+        .join(Market, Market.id == Judgment.market_id)
+        .where(
+            Judgment.market_id.in_(list(market_ids.keys())),
+            Judgment.created_at >= cutoff,
+        )
+        .order_by(desc(Judgment.created_at))
+    )
+    recent_result = await session.execute(recent_stmt)
+    recent_rows = recent_result.all()
+
+    # Group by symbol, latest first
+    symbol_judgments: dict[str, list] = {}
+    for j, sym in recent_rows:
+        symbol_judgments.setdefault(sym, []).append(j)
+
+    for sym, judgments in symbol_judgments.items():
+        if not judgments:
+            continue
+
+        latest = judgments[0]
+        dir_cn = {"up": "看涨", "down": "看跌", "flat": "观望"}.get(latest.direction, latest.direction)
+
+        # 1. High confidence signals (>0.65)
+        if latest.confidence_score > 0.65:
+            alerts.append({
+                "symbol": sym,
+                "alert_type": "high_confidence",
+                "title": f"{sym} 高置信信号",
+                "detail": f"{dir_cn} 置信度 {latest.confidence_score * 100:.0f}%",
+                "timestamp": latest.created_at.isoformat(),
+            })
+
+        # 2. Large deviation (>5%)
+        if latest.deviation_pct is not None and abs(latest.deviation_pct) > 5.0:
+            direction_word = "被低估" if latest.deviation_pct > 0 else "被高估"
+            alerts.append({
+                "symbol": sym,
+                "alert_type": "large_deviation",
+                "title": f"{sym} 大偏差",
+                "detail": f"偏差 {latest.deviation_pct:+.1f}% ({direction_word})",
+                "timestamp": latest.created_at.isoformat(),
+            })
+
+        # 3. Direction change (compare latest with previous)
+        if len(judgments) >= 2:
+            prev = judgments[1]
+            if latest.direction != prev.direction:
+                prev_cn = {"up": "看涨", "down": "看跌", "flat": "观望"}.get(prev.direction, prev.direction)
+                alerts.append({
+                    "symbol": sym,
+                    "alert_type": "direction_change",
+                    "title": f"{sym} 方向变化",
+                    "detail": f"{prev_cn} -> {dir_cn}",
+                    "timestamp": latest.created_at.isoformat(),
+                })
+
+    # Sort by timestamp descending
+    alerts.sort(key=lambda a: a["timestamp"], reverse=True)
+
+    return {"alerts": alerts}
