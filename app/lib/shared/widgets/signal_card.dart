@@ -2,10 +2,10 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_theme.dart';
-import 'confidence_bar.dart';
-import 'direction_badge.dart';
+import 'signal_strength.dart';
 
-/// Market signal card for the dashboard — shows AI judgment with all key info.
+/// Market signal card for the dashboard — direction + reasoning as hero content.
+/// Designed for non-technical users: Chinese market names, plain language.
 class SignalCard extends StatelessWidget {
   final String symbol;
   final String? name;
@@ -47,24 +47,76 @@ class SignalCard extends StatelessWidget {
   /// Strip "[model_name] " prefix from reasoning text.
   static String cleanReasoning(String? text) {
     if (text == null || text.isEmpty) return '';
-    // Remove all "[xxx] " prefixes and " | [xxx] " separators
     return text
         .replaceAll(RegExp(r'\[[\w-]+\]\s*'), '')
         .replaceAll(RegExp(r'\s*\|\s*'), '\n\n')
         .trim();
   }
 
+  /// Map symbol to Chinese name for common markets.
+  static String _chineseName(String symbol) {
+    const nameMap = {
+      'BTC-USD': '比特币 BTC',
+      'ETH-USD': '以太坊 ETH',
+      'SOL-USD': '索拉纳 SOL',
+      'BNB-USD': '币安币 BNB',
+      'XRP-USD': '瑞波币 XRP',
+      'ADA-USD': '艾达币 ADA',
+      'DOGE-USD': '狗狗币 DOGE',
+      'DOT-USD': '波卡 DOT',
+      'AVAX-USD': '雪崩 AVAX',
+      'MATIC-USD': '多边形 MATIC',
+      'LINK-USD': '链环 LINK',
+      'UNI-USD': 'Uniswap UNI',
+      'AAPL': '苹果 AAPL',
+      'MSFT': '微软 MSFT',
+      'GOOGL': '谷歌 GOOGL',
+      'AMZN': '亚马逊 AMZN',
+      'TSLA': '特斯拉 TSLA',
+      'NVDA': '英伟达 NVDA',
+      'META': 'Meta META',
+      'AMD': '超威半导体 AMD',
+      'NFLX': '奈飞 NFLX',
+      'SPY': '标普500 SPY',
+      'QQQ': '纳指100 QQQ',
+      'DIA': '道指 DIA',
+      'GLD': '黄金ETF GLD',
+      'SLV': '白银ETF SLV',
+      'TLT': '长期国债 TLT',
+      'EUR-USD': '欧元/美元',
+      'GBP-USD': '英镑/美元',
+      'USD-JPY': '美元/日元',
+      'USD-CNY': '美元/人民币',
+      'AUD-USD': '澳元/美元',
+      'XAU-USD': '黄金',
+      'XAG-USD': '白银',
+      'CL=F': '原油',
+      'GC=F': '黄金期货',
+      'SI=F': '白银期货',
+      '^GSPC': '标普500指数',
+      '^DJI': '道琼斯指数',
+      '^IXIC': '纳斯达克指数',
+      '^HSI': '恒生指数',
+      '000001.SS': '上证指数',
+      '399001.SZ': '深证成指',
+    };
+    return nameMap[symbol] ?? symbol;
+  }
+
   @override
   Widget build(BuildContext context) {
     final isUp = direction.toLowerCase() == 'up';
     final isDown = direction.toLowerCase() == 'down';
-    final changeColor = isUp
+    final dirColor = isUp
         ? AppTheme.upGreen
         : isDown
             ? AppTheme.downRed
             : AppTheme.flatGray;
+    final dirText = isUp ? '看涨' : isDown ? '看跌' : '观望';
+    final dirArrow = isUp ? ' ↑' : isDown ? ' ↓' : ' →';
 
     final cleanedReasoning = cleanReasoning(reasoning);
+    final displayName = _chineseName(symbol);
 
     return GestureDetector(
       onTap: onTap,
@@ -74,7 +126,7 @@ class SignalCard extends StatelessWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // ── Row 1: star + symbol + quality + direction badge + help button ──
+            // ── Row 1: star + name + quality + share/help ──
             Row(
               children: [
                 // Star icon
@@ -98,7 +150,7 @@ class SignalCard extends StatelessWidget {
                     children: [
                       Flexible(
                         child: Text(
-                          symbol,
+                          displayName,
                           style: const TextStyle(
                             color: AppTheme.textPrimary,
                             fontSize: 17,
@@ -130,32 +182,9 @@ class SignalCard extends StatelessWidget {
                           ),
                         ),
                       ],
-                      if (modelName != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: AppTheme.primary.withValues(alpha: 0.08),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            modelName!,
-                            style: const TextStyle(
-                              color: AppTheme.primary,
-                              fontSize: 10,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                        ),
-                      ],
                     ],
                   ),
                 ),
-                DirectionBadge(direction: direction),
-                const SizedBox(width: 8),
                 GestureDetector(
                   onTap: () => _shareSignal(),
                   child: Container(
@@ -209,101 +238,77 @@ class SignalCard extends StatelessWidget {
 
             const SizedBox(height: 12),
 
-            // ── Row 2: price + change % ──
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'AI 合理价格',
+            // ── Row 2: HERO — Direction prominently in Chinese ──
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+              decoration: BoxDecoration(
+                color: dirColor.withValues(alpha: 0.08),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      'AI预测: $dirText$dirArrow',
                       style: TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
-                      ),
-                    ),
-                    const SizedBox(height: 2),
-                    Text(
-                      price,
-                      style: AppTheme.largeNumber,
-                    ),
-                  ],
-                ),
-                if (changePct != null) ...[
-                  const SizedBox(width: 10),
-                  Padding(
-                    padding: const EdgeInsets.only(bottom: 4),
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(
-                        horizontal: 8,
-                        vertical: 3,
-                      ),
-                      decoration: BoxDecoration(
-                        color: changeColor.withValues(alpha: 0.10),
-                        borderRadius: BorderRadius.circular(6),
-                      ),
-                      child: Text(
-                        changePct!,
-                        style: TextStyle(
-                          color: changeColor,
-                          fontSize: 13,
-                          fontWeight: FontWeight.w600,
-                          fontFeatures: const [FontFeature.tabularFigures()],
-                        ),
+                        color: dirColor,
+                        fontSize: 18,
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
                       ),
                     ),
                   ),
-                ],
-                const Spacer(),
-                // Settlement status
-                if (isSettled == true) ...[
-                  Icon(
-                    isCorrect == true
-                        ? Icons.check_circle_rounded
-                        : Icons.cancel_rounded,
-                    size: 20,
-                    color:
-                        isCorrect == true ? AppTheme.upGreen : AppTheme.downRed,
-                  ),
-                  const SizedBox(width: 4),
-                  Text(
-                    isCorrect == true ? '正确' : '错误',
-                    style: TextStyle(
+                  // Settlement status
+                  if (isSettled == true) ...[
+                    Icon(
+                      isCorrect == true
+                          ? Icons.check_circle_rounded
+                          : Icons.cancel_rounded,
+                      size: 18,
                       color: isCorrect == true
                           ? AppTheme.upGreen
                           : AppTheme.downRed,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
                     ),
-                  ),
-                ] else ...[
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 6,
-                      vertical: 2,
-                    ),
-                    decoration: BoxDecoration(
-                      color: AppTheme.surface,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      horizonHours != null ? '${horizonHours}h 后验证' : '待验证',
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 11,
-                        fontWeight: FontWeight.w400,
+                    const SizedBox(width: 4),
+                    Text(
+                      isCorrect == true ? '判断正确' : '判断错误',
+                      style: TextStyle(
+                        color: isCorrect == true
+                            ? AppTheme.upGreen
+                            : AppTheme.downRed,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
                       ),
                     ),
-                  ),
+                  ] else
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 6,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.surface,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        horizonHours != null
+                            ? '${horizonHours}h后验证'
+                            : '待验证',
+                        style: const TextStyle(
+                          color: AppTheme.textSecondary,
+                          fontSize: 11,
+                          fontWeight: FontWeight.w400,
+                        ),
+                      ),
+                    ),
                 ],
-              ],
+              ),
             ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // ── Row 3: AI reasoning summary ──
+            // ── Row 3: AI reasoning — HERO content, first thing to read ──
             if (cleanedReasoning.isNotEmpty)
               Container(
                 width: double.infinity,
@@ -312,27 +317,79 @@ class SignalCard extends StatelessWidget {
                 decoration: BoxDecoration(
                   color: AppTheme.surface,
                   borderRadius: BorderRadius.circular(8),
+                  border: const Border(
+                    left: BorderSide(
+                      color: AppTheme.primary,
+                      width: 3,
+                    ),
+                  ),
                 ),
                 child: Text(
                   cleanedReasoning,
-                  maxLines: 2,
+                  maxLines: 3,
                   overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: AppTheme.textSecondary,
-                    fontSize: 12,
+                    color: AppTheme.textPrimary,
+                    fontSize: 13,
                     fontWeight: FontWeight.w400,
                     height: 1.5,
                   ),
                 ),
               ),
 
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
 
-            // ── Row 4: confidence bar + time ──
+            // ── Row 4: Fair price with context ──
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      '合理价格',
+                      style: TextStyle(
+                        color: AppTheme.textSecondary,
+                        fontSize: 11,
+                        fontWeight: FontWeight.w400,
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      '\$$price',
+                      style: AppTheme.largeNumber,
+                    ),
+                  ],
+                ),
+                if (changePct != null) ...[
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Text(
+                      _deviationContext(),
+                      style: TextStyle(
+                        color: isUp
+                            ? AppTheme.upGreen
+                            : isDown
+                                ? AppTheme.downRed
+                                : AppTheme.flatGray,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                      maxLines: 2,
+                    ),
+                  ),
+                ] else
+                  const Spacer(),
+              ],
+            ),
+
+            const SizedBox(height: 10),
+
+            // ── Row 5: signal strength + model + time ──
             Row(
               children: [
                 const Text(
-                  '置信度',
+                  '信号强度',
                   style: TextStyle(
                     color: AppTheme.textSecondary,
                     fontSize: 11,
@@ -340,14 +397,39 @@ class SignalCard extends StatelessWidget {
                   ),
                 ),
                 const SizedBox(width: 8),
-                Expanded(
-                  child: ConfidenceBar(
-                    confidence: confidence,
-                    height: 4,
+                SignalStrength(confidence: confidence),
+                const SizedBox(width: 8),
+                Text(
+                  'AI把握度 ${(confidence * 100).toStringAsFixed(0)}%',
+                  style: const TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 11,
+                    fontWeight: FontWeight.w500,
                   ),
                 ),
-                if (createdAt != null) ...[
-                  const SizedBox(width: 12),
+                const Spacer(),
+                if (modelName != null) ...[
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 6,
+                      vertical: 2,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.08),
+                      borderRadius: BorderRadius.circular(4),
+                    ),
+                    child: Text(
+                      modelName!,
+                      style: const TextStyle(
+                        color: AppTheme.primary,
+                        fontSize: 10,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                ],
+                if (createdAt != null)
                   Text(
                     DateFormat('MM/dd HH:mm').format(createdAt!.toLocal()),
                     style: const TextStyle(
@@ -356,13 +438,27 @@ class SignalCard extends StatelessWidget {
                       fontWeight: FontWeight.w400,
                     ),
                   ),
-                ],
               ],
             ),
           ],
         ),
       ),
     );
+  }
+
+  /// Build a context string for the deviation, e.g. "当前偏高2.1%"
+  String _deviationContext() {
+    if (changePct == null) return '';
+    // Parse the changePct string (e.g. "+1.80%" or "-2.30%")
+    final cleaned = changePct!.replaceAll('%', '').trim();
+    final val = double.tryParse(cleaned);
+    if (val == null) return '价格偏离 $changePct';
+    if (val > 0) {
+      return '当前偏低${val.abs().toStringAsFixed(1)}%';
+    } else if (val < 0) {
+      return '当前偏高${val.abs().toStringAsFixed(1)}%';
+    }
+    return '价格接近合理水平';
   }
 
   void _shareSignal() {
@@ -376,9 +472,10 @@ class SignalCard extends StatelessWidget {
     final snippet = reasoningSnippet.length > 50
         ? '${reasoningSnippet.substring(0, 50)}...'
         : reasoningSnippet;
+    final displayName = _chineseName(symbol);
 
     final text =
-        '天演AI信号 | $symbol $directionCn $confPct% | 合理价格 \$$price | 分析: $snippet';
+        '天演AI信号 | $displayName $directionCn (把握度$confPct%) | 合理价格 \$$price | 分析: $snippet';
     Share.share(text);
   }
 
@@ -409,7 +506,7 @@ class SignalCard extends StatelessWidget {
             ),
             const SizedBox(height: 20),
             const Text(
-              '字段说明',
+              '看懂信号卡',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
@@ -417,20 +514,18 @@ class SignalCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 16),
-            _explainRow('方向标签', '看涨/看跌/观望',
-                'AI 模型对未来价格走势的判断方向。'),
-            _explainRow('AI 合理价格', '如 69800.00',
-                'AI 模型认为该资产在预测周期内的合理价格估值。'),
-            _explainRow('偏差百分比', '如 +1.80%',
-                'AI 合理价格与当前市场价格的偏差程度，正值表示被低估，负值表示被高估。'),
-            _explainRow('置信度', '0% ~ 100%',
-                '多模型共识：3个模型一致=高，2个一致=中，1个或分歧=低。当前仅 DeepSeek 单模型运行。'),
+            _explainRow('AI预测方向', '看涨/看跌/观望',
+                'AI对未来价格走势的判断。绿色看涨表示预计上涨，红色看跌表示预计下跌。'),
+            _explainRow('AI分析', '灰色文本区',
+                'AI模型对当前市场状况的分析推理，解释为什么做出这个判断。'),
+            _explainRow('合理价格', '如 \$69,800',
+                'AI认为该资产在预测周期内应该值多少钱。'),
+            _explainRow('价格偏离', '如 当前偏高2.1%',
+                '当前市场价格与AI认为的合理价格之间的差距。偏高意味着可能会跌回来。'),
+            _explainRow('信号强度', '1-5格信号条',
+                '表示AI对这次判断有多大把握。格数越多越有信心。'),
             _explainRow('验证状态', '待验证/正确/错误',
-                '预测到期后，系统自动对比实际价格走势来验证判断是否正确。'),
-            _explainRow('模型标签', '如 deepseek',
-                '做出该判断的 AI 模型名称。'),
-            _explainRow('AI 分析', '灰色文本区',
-                'AI 模型对当前市场状况的分析推理过程。'),
+                '预测到期后，系统自动对比实际走势来检验AI判断是否准确。'),
           ],
         ),
       ),

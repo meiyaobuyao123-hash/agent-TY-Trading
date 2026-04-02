@@ -221,6 +221,47 @@ async def get_related_markets(
     return out
 
 
+@router.post("/cleanup-inactive", status_code=200)
+async def cleanup_inactive_markets(
+    session: AsyncSession = Depends(get_session),
+):
+    """Deactivate markets that have NEVER had a successful price fetch.
+
+    Finds markets where ALL snapshots have price=NULL or no snapshots exist,
+    and sets is_active=False.
+    """
+    # Find all active markets
+    active_stmt = select(Market).where(Market.is_active == True)
+    result = await session.execute(active_stmt)
+    active_markets = result.scalars().all()
+
+    deactivated = []
+    for market in active_markets:
+        # Check if this market has ANY snapshot with a non-null price
+        has_data_stmt = (
+            select(func.count())
+            .select_from(MarketSnapshot)
+            .where(
+                MarketSnapshot.market_id == market.id,
+                MarketSnapshot.price.isnot(None),
+            )
+        )
+        has_data_result = await session.execute(has_data_stmt)
+        count = has_data_result.scalar() or 0
+
+        if count == 0:
+            market.is_active = False
+            deactivated.append(market.symbol)
+
+    await session.commit()
+
+    return {
+        "deactivated_count": len(deactivated),
+        "deactivated_symbols": deactivated,
+        "message": f"已停用 {len(deactivated)} 个无数据的市场",
+    }
+
+
 @router.post("", response_model=MarketOut, status_code=201)
 async def create_market(
     body: MarketCreate,

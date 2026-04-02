@@ -1,4 +1,12 @@
-"""Accuracy tracker — settles expired judgments and recalculates accuracy stats."""
+"""Accuracy tracker — settles expired judgments and recalculates accuracy stats.
+
+Settlement uses market-type-specific thresholds so that trivially-flat
+markets (e.g. pegged forex pairs) don't inflate the accuracy numbers.
+A judgment that predicts "flat" is only counted as correct when the
+price truly stayed flat AND the model expressed meaningful confidence
+(confidence_score >= 0.3).  Otherwise the flat-flat match is marked
+as "excluded" (is_correct = None) and does not count toward accuracy.
+"""
 
 from __future__ import annotations
 
@@ -14,6 +22,22 @@ from backend.core.plugin_base import EvolutionPlugin
 from backend.models import AccuracyStat, Judgment, Market, MarketSnapshot, Settlement
 
 logger = logging.getLogger(__name__)
+
+# Market-type-specific flat thresholds (percentage).
+# If actual price moves less than this, actual_direction = "flat".
+# More volatile markets need a wider threshold; stable markets a tighter one.
+FLAT_THRESHOLD_PCT: dict[str, float] = {
+    "crypto": 1.0,          # crypto is volatile; 1% in 4h is noise
+    "us-equities": 0.5,     # stocks: 0.5% in 24h is noise
+    "cn-equities": 0.5,
+    "hk-equities": 0.5,
+    "global-indices": 0.3,
+    "commodities": 0.5,
+    "forex": 0.15,           # forex moves are tiny; 0.15% is already noise
+    "macro": 0.1,
+    "prediction-markets": 1.0,
+}
+DEFAULT_FLAT_THRESHOLD = 0.5
 
 
 class AccuracyTrackerPlugin(EvolutionPlugin):
@@ -85,21 +109,41 @@ async def settle_judgments(session: AsyncSession) -> int:
             orig_snap = orig_result.scalar_one_or_none()
 
             if orig_snap is None or orig_snap.price is None:
-                # Use a fallback: just mark as not determinable
                 continue
 
             orig_price = orig_snap.price
             actual_price = latest_snap.price
 
-            # Determine actual direction (0.5% threshold to avoid noise)
-            if actual_price > orig_price * 1.005:
+            # Look up market_type for threshold selection
+            mkt_stmt = select(Market.market_type).where(Market.id == j.market_id)
+            mkt_result = await session.execute(mkt_stmt)
+            mkt_type = mkt_result.scalar_one_or_none() or "unknown"
+            flat_threshold = FLAT_THRESHOLD_PCT.get(mkt_type, DEFAULT_FLAT_THRESHOLD) / 100.0
+
+            # Determine actual direction using market-type-specific threshold
+            pct_move = (actual_price - orig_price) / orig_price if orig_price else 0
+            if pct_move > flat_threshold:
                 actual_direction = "up"
-            elif actual_price < orig_price * 0.995:
+            elif pct_move < -flat_threshold:
                 actual_direction = "down"
             else:
                 actual_direction = "flat"
 
-            is_correct = j.direction == actual_direction
+            # Honest accuracy: flat-predicted-flat only counts when the model
+            # actually expressed meaningful confidence (>= 0.3).  A low-confidence
+            # flat prediction matching a flat outcome is too trivial to count.
+            if j.direction == "flat" and actual_direction == "flat":
+                if j.confidence_score < 0.3:
+                    # Exclude from accuracy: mark is_correct = None
+                    is_correct = None
+                    logger.debug(
+                        "Excluding low-confidence flat-flat for %s (conf=%.2f)",
+                        j.id, j.confidence_score,
+                    )
+                else:
+                    is_correct = True
+            else:
+                is_correct = j.direction == actual_direction
 
             settlement = Settlement(
                 id=uuid.uuid4(),
@@ -155,6 +199,7 @@ async def recalculate_accuracy(session: AsyncSession) -> int:
             )
 
             # Count total and correct settled judgments
+            # Exclude settlements where is_correct IS NULL (trivial flat-flat)
             base_stmt = (
                 select(
                     func.count(Settlement.id),
@@ -166,6 +211,7 @@ async def recalculate_accuracy(session: AsyncSession) -> int:
                     and_(
                         Market.market_type == mt,
                         Settlement.settled_at >= cutoff,
+                        Settlement.is_correct.isnot(None),
                     )
                 )
             )
@@ -191,6 +237,7 @@ async def recalculate_accuracy(session: AsyncSession) -> int:
                             Market.market_type == mt,
                             Judgment.confidence == conf_level,
                             Settlement.settled_at >= cutoff,
+                            Settlement.is_correct.isnot(None),
                         )
                     )
                 )

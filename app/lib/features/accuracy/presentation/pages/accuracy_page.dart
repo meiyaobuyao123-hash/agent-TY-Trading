@@ -17,9 +17,13 @@ class AccuracyPage extends ConsumerWidget {
   static const _typeLabels = {
     'crypto': '加密货币',
     'cn-equities': 'A股',
+    'us-equities': '美股',
+    'hk-equities': '港股',
     'global-indices': '全球指数',
     'forex': '外汇',
+    'commodities': '大宗商品',
     'macro': '宏观指标',
+    'etf': 'ETF基金',
     'prediction-markets': '预测市场',
   };
 
@@ -107,7 +111,7 @@ class AccuracyPage extends ConsumerWidget {
         children: [
           // Large title
           const Padding(
-            padding: EdgeInsets.only(top: 16, bottom: 24),
+            padding: EdgeInsets.only(top: 16, bottom: 12),
             child: Text(
               'AI 进化',
               style: TextStyle(
@@ -116,6 +120,33 @@ class AccuracyPage extends ConsumerWidget {
                 color: AppTheme.textPrimary,
                 letterSpacing: -0.5,
               ),
+            ),
+          ),
+
+          // Accuracy explanation
+          Container(
+            margin: const EdgeInsets.only(bottom: 20),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    size: 14, color: AppTheme.primary),
+                SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    '准确率反映AI判断的历史正确率。数值越高，说明AI对该市场的理解越深。',
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
 

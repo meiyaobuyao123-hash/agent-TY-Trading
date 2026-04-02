@@ -33,6 +33,7 @@ DATA_SOURCE_MAP = {
     "macro": "fred-macro",
     "forex": "frankfurter-fx",
     "prediction-markets": "polymarket-gamma",
+    "etf": "yfinance-global",
 }
 
 # Different prediction horizons per market type
@@ -46,6 +47,7 @@ HORIZON_MAP = {
     "commodities": 24,
     "macro": 168,  # 7 days for macro indicators
     "prediction-markets": 24,
+    "etf": 24,
 }
 
 # Map market_type string to MarketType enum for DataQuery
@@ -59,6 +61,7 @@ _MARKET_TYPE_ENUM = {
     "macro": MarketType.MACRO,
     "forex": MarketType.FOREX,
     "prediction-markets": MarketType.PREDICTION_MARKETS,
+    "etf": MarketType.ETF,
 }
 
 
@@ -405,14 +408,12 @@ async def trigger_judgment_cycle(
     )
     logger.info("Batch tick fetch complete: %d/%d symbols have data", len(tick_cache), len(markets))
 
-    # 3. Process markets concurrently with semaphore to limit AI calls
-    semaphore = asyncio.Semaphore(3)
+    # 3. Process markets sequentially (SQLAlchemy async session is not safe for concurrent flushes)
     judgments: list[Judgment] = []
     skipped_count = 0
 
-    async def _process_with_semaphore(market: Market):
-        nonlocal skipped_count
-        async with semaphore:
+    for market in markets:
+        try:
             j = await _process_single_market(
                 market, plugin_manager, session, reasoning, horizon_hours, tick_cache
             )
@@ -420,11 +421,9 @@ async def trigger_judgment_cycle(
                 judgments.append(j)
             else:
                 skipped_count += 1
-
-    await asyncio.gather(
-        *[_process_with_semaphore(m) for m in markets],
-        return_exceptions=True,
-    )
+        except Exception:
+            logger.exception("Error processing market %s", market.symbol)
+            skipped_count += 1
 
     if judgments:
         await session.commit()

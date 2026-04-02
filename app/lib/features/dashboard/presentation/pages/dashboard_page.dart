@@ -132,13 +132,47 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ),
             ),
 
-          const SizedBox(height: 24),
+          // Dashboard info text
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: AppTheme.primary.withValues(alpha: 0.06),
+                borderRadius: BorderRadius.circular(8),
+              ),
+              child: const Row(
+                children: [
+                  Icon(Icons.info_outline_rounded,
+                      size: 14, color: AppTheme.primary),
+                  SizedBox(width: 6),
+                  Expanded(
+                    child: Text(
+                      'AI每4小时分析全球179个市场，给出方向判断和合理价格估值',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: AppTheme.textSecondary,
+                        height: 1.4,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 16),
 
           // Onboarding card (dismissible)
           if (_onboardingChecked && _showOnboarding) ...[
             _buildOnboardingCard(),
             const SizedBox(height: 16),
           ],
+
+          // Market overview summary card
+          _buildMarketOverview(upCount, downCount, totalCount - upCount - downCount),
+
+          const SizedBox(height: 12),
 
           // Summary metric cards
           _buildMetricRow(activeMarkets, totalCount, upCount, downCount),
@@ -970,6 +1004,93 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               ),
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildMarketOverview(int upCount, int downCount, int flatCount) {
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: AppTheme.primary.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: const Icon(Icons.public_rounded,
+                    size: 16, color: AppTheme.primary),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                '市场概览',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          RichText(
+            text: TextSpan(
+              style: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.w500,
+                color: AppTheme.textPrimary,
+              ),
+              children: [
+                const TextSpan(text: '今日全球市场：'),
+                TextSpan(
+                  text: '$upCount涨',
+                  style: const TextStyle(
+                    color: AppTheme.upGreen,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const TextSpan(text: '  '),
+                TextSpan(
+                  text: '$downCount跌',
+                  style: const TextStyle(
+                    color: AppTheme.downRed,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+                const TextSpan(text: '  '),
+                TextSpan(
+                  text: '$flatCount横盘',
+                  style: const TextStyle(
+                    color: AppTheme.flatGray,
+                    fontWeight: FontWeight.w700,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            upCount > downCount
+                ? '整体偏多头，市场情绪积极'
+                : downCount > upCount
+                    ? '整体偏空头，市场情绪谨慎'
+                    : '多空均衡，市场处于观望状态',
+            style: const TextStyle(
+              fontSize: 13,
+              color: AppTheme.textSecondary,
+              height: 1.4,
+            ),
+          ),
+        ],
       ),
     );
   }

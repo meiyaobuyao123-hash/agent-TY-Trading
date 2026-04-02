@@ -22,6 +22,7 @@ logger = logging.getLogger(__name__)
 
 # Map our symbols to Binance symbols
 SYMBOL_MAP = {
+    # Top 20 (existing)
     "BTC-USD": "BTCUSDT",
     "ETH-USD": "ETHUSDT",
     "SOL-USD": "SOLUSDT",
@@ -42,6 +43,27 @@ SYMBOL_MAP = {
     "APT-USD": "APTUSDT",
     "NEAR-USD": "NEARUSDT",
     "FIL-USD": "FILUSDT",
+    # Round 9 expansion — top 50 coverage
+    "TRX-USD": "TRXUSDT",
+    "TON-USD": "TONUSDT",
+    "SHIB-USD": "SHIBUSDT",
+    "PEPE-USD": "PEPEUSDT",
+    "WIF-USD": "WIFUSDT",
+    "BONK-USD": "BONKUSDT",
+    "RENDER-USD": "RENDERUSDT",
+    "FET-USD": "FETUSDT",
+    "INJ-USD": "INJUSDT",
+    "SEI-USD": "SEIUSDT",
+    "TIA-USD": "TIAUSDT",
+    "JUP-USD": "JUPUSDT",
+    "WLD-USD": "WLDUSDT",
+    "AAVE-USD": "AAVEUSDT",
+    "MKR-USD": "MKRUSDT",
+    "SNX-USD": "SNXUSDT",
+    "COMP-USD": "COMPUSDT",
+    "CRV-USD": "CRVUSDT",
+    "ALGO-USD": "ALGOUSDT",
+    "HBAR-USD": "HBARUSDT",
 }
 
 REVERSE_MAP = {v: k for k, v in SYMBOL_MAP.items()}

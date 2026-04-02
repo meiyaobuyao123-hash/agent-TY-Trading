@@ -535,7 +535,7 @@ class MarketDetailPage extends ConsumerWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   const Text(
-                    '置信度',
+                    'AI把握度',
                     style: TextStyle(
                       fontSize: 11,
                       color: AppTheme.textSecondary,
@@ -612,6 +612,32 @@ class MarketDetailPage extends ConsumerWidget {
                   fontWeight: FontWeight.w600,
                 ),
               ),
+            ),
+          ),
+          // AI analysis explanation
+          const SizedBox(height: 10),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Row(
+              children: [
+                Icon(Icons.info_outline_rounded,
+                    size: 13, color: AppTheme.primary),
+                SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    '以上分析由DeepSeek AI模型生成，结合价格走势、成交量和跨市场关联进行综合判断。',
+                    style: TextStyle(
+                      fontSize: 11,
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
             ),
           ),
         ],

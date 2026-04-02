@@ -23,6 +23,7 @@ class MarketType(str, Enum):
     GLOBAL_INDICES = "global-indices"
     DEFI = "defi"
     MACRO = "macro"
+    ETF = "etf"
 
 
 class Timeframe(str, Enum):

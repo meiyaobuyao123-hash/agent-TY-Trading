@@ -26,7 +26,7 @@ logger = logging.getLogger(__name__)
 
 # ── Symbol mapping: our symbol -> stooq symbol ──
 STOOQ_MAP = {
-    # US Stocks (append .US)
+    # US Stocks (append .US) — existing 35
     "AAPL": "aapl.us", "TSLA": "tsla.us", "NVDA": "nvda.us", "MSFT": "msft.us",
     "GOOGL": "googl.us", "AMZN": "amzn.us", "META": "meta.us", "AMD": "amd.us",
     "INTC": "intc.us", "JPM": "jpm.us", "GS": "gs.us", "BAC": "bac.us",
@@ -36,6 +36,24 @@ STOOQ_MAP = {
     "ORCL": "orcl.us", "CSCO": "csco.us", "QCOM": "qcom.us", "AVGO": "avgo.us",
     "MU": "mu.us", "PYPL": "pypl.us", "SQ": "sq.us", "COIN": "coin.us",
     "PLTR": "pltr.us", "UBER": "uber.us", "ABNB": "abnb.us",
+    # US Stocks — Round 9 expansion (tech)
+    "SHOP": "shop.us", "SNOW": "snow.us", "NET": "net.us", "DDOG": "ddog.us",
+    "ZS": "zs.us", "CRWD": "crwd.us", "PANW": "panw.us",
+    # US Stocks — healthcare
+    "ABBV": "abbv.us", "LLY": "lly.us", "UNH": "unh.us", "MRK": "mrk.us",
+    "TMO": "tmo.us",
+    # US Stocks — energy
+    "SLB": "slb.us", "EOG": "eog.us", "OXY": "oxy.us",
+    # US Stocks — consumer
+    "SBUX": "sbux.us", "NKE": "nke.us", "MCD": "mcd.us", "KO": "ko.us",
+    "PEP": "pep.us",
+    # US Stocks — financials
+    "BRK-B": "brk-b.us", "C": "c.us", "WFC": "wfc.us", "AXP": "axp.us",
+    "BLK": "blk.us", "SCHW": "schw.us",
+    # ETFs
+    "SPY": "spy.us", "QQQ": "qqq.us", "IWM": "iwm.us", "DIA": "dia.us",
+    "GLD": "gld.us", "SLV": "slv.us", "USO": "uso.us", "TLT": "tlt.us",
+    "HYG": "hyg.us", "EEM": "eem.us", "VWO": "vwo.us", "FXI": "fxi.us",
     # HK Stocks (append .HK)
     "0700.HK": "0700.hk", "9988.HK": "9988.hk", "3690.HK": "3690.hk",
     "9618.HK": "9618.hk", "1810.HK": "1810.hk", "2318.HK": "2318.hk",
@@ -61,6 +79,19 @@ YFINANCE_MAP = {
     "ORCL": "ORCL", "CSCO": "CSCO", "QCOM": "QCOM", "AVGO": "AVGO",
     "MU": "MU", "PYPL": "PYPL", "SQ": "SQ", "COIN": "COIN",
     "PLTR": "PLTR", "UBER": "UBER", "ABNB": "ABNB",
+    # Round 9 expansion
+    "SHOP": "SHOP", "SNOW": "SNOW", "NET": "NET", "DDOG": "DDOG",
+    "ZS": "ZS", "CRWD": "CRWD", "PANW": "PANW",
+    "ABBV": "ABBV", "LLY": "LLY", "UNH": "UNH", "MRK": "MRK", "TMO": "TMO",
+    "SLB": "SLB", "EOG": "EOG", "OXY": "OXY",
+    "SBUX": "SBUX", "NKE": "NKE", "MCD": "MCD", "KO": "KO", "PEP": "PEP",
+    "BRK-B": "BRK-B", "C": "C", "WFC": "WFC", "AXP": "AXP",
+    "BLK": "BLK", "SCHW": "SCHW",
+    # ETFs
+    "SPY": "SPY", "QQQ": "QQQ", "IWM": "IWM", "DIA": "DIA",
+    "GLD": "GLD", "SLV": "SLV", "USO": "USO", "TLT": "TLT",
+    "HYG": "HYG", "EEM": "EEM", "VWO": "VWO", "FXI": "FXI",
+    # HK
     "0700.HK": "0700.HK", "9988.HK": "9988.HK", "3690.HK": "3690.HK",
     "9618.HK": "9618.HK", "1810.HK": "1810.HK", "2318.HK": "2318.HK",
     "0005.HK": "0005.HK", "1299.HK": "1299.HK", "9888.HK": "9888.HK",
@@ -78,6 +109,16 @@ US_STOCKS = {
     "JPM", "GS", "BAC", "V", "MA", "JNJ", "PFE", "XOM", "CVX", "WMT",
     "COST", "HD", "DIS", "NFLX", "CRM", "ORCL", "CSCO", "QCOM", "AVGO",
     "MU", "PYPL", "SQ", "COIN", "PLTR", "UBER", "ABNB",
+    # Round 9 expansion
+    "SHOP", "SNOW", "NET", "DDOG", "ZS", "CRWD", "PANW",
+    "ABBV", "LLY", "UNH", "MRK", "TMO",
+    "SLB", "EOG", "OXY",
+    "SBUX", "NKE", "MCD", "KO", "PEP",
+    "BRK-B", "C", "WFC", "AXP", "BLK", "SCHW",
+}
+ETFS = {
+    "SPY", "QQQ", "IWM", "DIA", "GLD", "SLV", "USO", "TLT",
+    "HYG", "EEM", "VWO", "FXI",
 }
 HK_STOCKS = {
     "0700.HK", "9988.HK", "3690.HK", "9618.HK", "1810.HK",
@@ -88,6 +129,8 @@ COMMODITIES = {"GOLD", "OIL", "SILVER", "NATGAS", "COPPER"}
 
 
 def _market_type_for(symbol: str) -> MarketType:
+    if symbol in ETFS:
+        return MarketType.ETF
     if symbol in US_STOCKS:
         return MarketType.US_EQUITIES
     if symbol in HK_STOCKS:
@@ -133,43 +176,60 @@ class YFinanceDataSource(DataSourcePlugin):
         )
 
     async def _fetch_stooq_tick(self, symbol: str) -> Optional[dict]:
-        """Fetch a single tick from stooq.com CSV API."""
+        """Fetch a single tick from stooq.com CSV API with retry on disconnect."""
+        import asyncio as _aio
+
         stooq_sym = STOOQ_MAP.get(symbol)
         if not stooq_sym:
             return None
-        try:
-            # f= fields: s=symbol d2=date t2=time o=open h=high l=low c=close v=volume
-            resp = await self._client.get(
-                STOOQ_BASE,
-                params={"s": stooq_sym, "f": "sd2t2ohlcv", "h": "", "e": "csv"},
-                follow_redirects=True,
-            )
-            resp.raise_for_status()
-            lines = resp.text.strip().split("\n")
-            if len(lines) < 2:
+
+        max_retries = 2
+        for attempt in range(max_retries + 1):
+            try:
+                # f= fields: s=symbol d2=date t2=time o=open h=high l=low c=close v=volume
+                resp = await self._client.get(
+                    STOOQ_BASE,
+                    params={"s": stooq_sym, "f": "sd2t2ohlcv", "h": "", "e": "csv"},
+                    follow_redirects=True,
+                )
+                resp.raise_for_status()
+                lines = resp.text.strip().split("\n")
+                if len(lines) < 2:
+                    return None
+
+                # Parse CSV header and data
+                header = [h.strip().lower() for h in lines[0].split(",")]
+                values = [v.strip() for v in lines[1].split(",")]
+                row = dict(zip(header, values))
+
+                close_val = row.get("close", "")
+                if not close_val or close_val == "N/D":
+                    logger.warning("Stooq returned N/D for %s (%s)", symbol, stooq_sym)
+                    return None
+
+                return {
+                    "price": float(close_val),
+                    "open": float(row.get("open", 0) or 0),
+                    "high": float(row.get("high", 0) or 0),
+                    "low": float(row.get("low", 0) or 0),
+                    "volume": float(row.get("volume", 0) or 0),
+                    "date": row.get("date", ""),
+                }
+            except (httpx.RemoteProtocolError, httpx.ReadError, httpx.ConnectError) as exc:
+                if attempt < max_retries:
+                    wait = 0.5 * (attempt + 1)
+                    logger.warning(
+                        "Stooq connection error for %s (attempt %d/%d), retrying in %.1fs: %s",
+                        symbol, attempt + 1, max_retries + 1, wait, exc,
+                    )
+                    await _aio.sleep(wait)
+                else:
+                    logger.error("Stooq fetch failed after %d attempts for %s (%s)", max_retries + 1, symbol, stooq_sym)
+                    return None
+            except Exception:
+                logger.exception("Stooq fetch failed for %s (%s)", symbol, stooq_sym)
                 return None
-
-            # Parse CSV header and data
-            header = [h.strip().lower() for h in lines[0].split(",")]
-            values = [v.strip() for v in lines[1].split(",")]
-            row = dict(zip(header, values))
-
-            close_val = row.get("close", "")
-            if not close_val or close_val == "N/D":
-                logger.warning("Stooq returned N/D for %s (%s)", symbol, stooq_sym)
-                return None
-
-            return {
-                "price": float(close_val),
-                "open": float(row.get("open", 0) or 0),
-                "high": float(row.get("high", 0) or 0),
-                "low": float(row.get("low", 0) or 0),
-                "volume": float(row.get("volume", 0) or 0),
-                "date": row.get("date", ""),
-            }
-        except Exception:
-            logger.exception("Stooq fetch failed for %s (%s)", symbol, stooq_sym)
-            return None
+        return None
 
     async def _fetch_stooq_history(self, symbol: str) -> Optional[list[dict]]:
         """Fetch historical daily data from stooq.com."""
@@ -257,9 +317,14 @@ class YFinanceDataSource(DataSourcePlugin):
 
     async def fetch_ticks(self, symbols: list[str]) -> list[MarketTick]:
         """Fetch current price ticks for given symbols via stooq.com."""
+        import asyncio as _aio
+
         ticks = []
-        for symbol in symbols:
+        for idx, symbol in enumerate(symbols):
             try:
+                # Rate limit: small delay between requests to avoid server disconnects
+                if idx > 0 and idx % 5 == 0:
+                    await _aio.sleep(0.3)
                 data = await self._fetch_stooq_tick(symbol)
                 if data and data.get("price"):
                     # Compute change_pct from history if available

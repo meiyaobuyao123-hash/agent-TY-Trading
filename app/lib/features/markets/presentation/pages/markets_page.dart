@@ -21,9 +21,13 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
   static const _typeLabels = {
     'crypto': '加密货币',
     'cn-equities': 'A股',
+    'us-equities': '美股',
+    'hk-equities': '港股',
     'global-indices': '全球指数',
     'forex': '外汇',
+    'commodities': '大宗商品',
     'macro': '宏观指标',
+    'etf': 'ETF基金',
     'prediction-markets': '预测市场',
   };
 
@@ -31,7 +35,9 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     _FilterChip(label: '全部', type: null),
     _FilterChip(label: '我的关注', type: '_favorites'),
     _FilterChip(label: '加密', type: 'crypto'),
+    _FilterChip(label: '美股', type: 'us-equities'),
     _FilterChip(label: 'A股', type: 'cn-equities'),
+    _FilterChip(label: 'ETF', type: 'etf'),
     _FilterChip(label: '外汇', type: 'forex'),
     _FilterChip(label: '宏观', type: 'macro'),
   ];

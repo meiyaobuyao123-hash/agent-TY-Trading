@@ -52,11 +52,17 @@ async def get_overview(
     )
     total_judgments = total_judgments_result.scalar() or 0
 
-    # Settled judgments
+    # Settled judgments (total)
     settled_result = await session.execute(
         select(func.count()).select_from(Settlement)
     )
     settled_judgments = settled_result.scalar() or 0
+
+    # Meaningful settled judgments (exclude trivial flat-flat with is_correct=NULL)
+    meaningful_result = await session.execute(
+        select(func.count()).select_from(Settlement).where(Settlement.is_correct.isnot(None))
+    )
+    meaningful_judgments = meaningful_result.scalar() or 0
 
     # Correct judgments
     correct_result = await session.execute(
@@ -64,10 +70,10 @@ async def get_overview(
     )
     correct_judgments = correct_result.scalar() or 0
 
-    # Overall accuracy
+    # Overall accuracy — based on meaningful judgments only
     overall_accuracy = 0.0
-    if settled_judgments > 0:
-        overall_accuracy = round((correct_judgments / settled_judgments) * 100, 1)
+    if meaningful_judgments > 0:
+        overall_accuracy = round((correct_judgments / meaningful_judgments) * 100, 1)
 
     # Days running — from the earliest judgment
     earliest_result = await session.execute(
