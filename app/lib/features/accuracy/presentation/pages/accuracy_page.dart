@@ -84,23 +84,23 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
               Icon(
                 Icons.auto_awesome_rounded,
                 size: 56,
-                color: AppTheme.divider,
+                color: AppTheme.dividerOf(context),
               ),
               const SizedBox(height: 16),
-              const Text(
+              Text(
                 '暂无进化数据',
                 style: TextStyle(
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimaryOf(context),
                   fontSize: 17,
                   fontWeight: FontWeight.w600,
                 ),
               ),
               const SizedBox(height: 8),
-              const Text(
+              Text(
                 'AI判断需要到期后才能验证准确率。首次判断将在4小时后结算。',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: AppTheme.textSecondary,
+                  color: AppTheme.textSecondaryOf(context),
                   fontSize: 14,
                   height: 1.5,
                 ),
@@ -114,8 +114,8 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
     return Column(
       children: [
         // Title
-        const Padding(
-          padding: EdgeInsets.fromLTRB(24, 16, 24, 0),
+        Padding(
+          padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
           child: Align(
             alignment: Alignment.centerLeft,
             child: Text(
@@ -123,7 +123,7 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimaryOf(context),
                 letterSpacing: -0.5,
               ),
             ),
@@ -134,7 +134,7 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
         Container(
           margin: const EdgeInsets.symmetric(horizontal: 24),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            color: AppTheme.surfaceOf(context),
             borderRadius: BorderRadius.circular(10),
           ),
           child: TabBar(
@@ -145,7 +145,7 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
               borderRadius: BorderRadius.circular(10),
             ),
             labelColor: Colors.white,
-            unselectedLabelColor: AppTheme.textSecondary,
+            unselectedLabelColor: AppTheme.textSecondaryOf(context),
             labelStyle: const TextStyle(
               fontSize: 13,
               fontWeight: FontWeight.w600,

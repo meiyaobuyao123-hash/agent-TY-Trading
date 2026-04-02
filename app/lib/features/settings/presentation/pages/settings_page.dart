@@ -289,17 +289,17 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           Expanded(
                             child: Text(
                               t.marketType,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: AppTheme.textPrimary,
+                                color: AppTheme.textPrimaryOf(context),
                               ),
                             ),
                           ),
                           Text(
                             '${t.withData}/${t.total}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 12,
-                              color: AppTheme.textSecondary,
+                              color: AppTheme.textSecondaryOf(context),
                               fontWeight: FontWeight.w500,
                             ),
                           ),
@@ -442,9 +442,9 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                           Expanded(
                             child: Text(
                               p.name,
-                              style: const TextStyle(
+                              style: TextStyle(
                                 fontSize: 13,
-                                color: AppTheme.textPrimary,
+                                color: AppTheme.textPrimaryOf(context),
                               ),
                             ),
                           ),
@@ -472,7 +472,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 icon: Icons.info_outline_rounded,
                 iconColor: AppTheme.flatGray,
                 title: '版本',
-                value: '3.0.0 (Build 30)',
+                value: '3.1.0 (Build 36)',
               ),
               _settingsRow(
                 icon: Icons.dns_outlined,
@@ -499,10 +499,10 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
       padding: const EdgeInsets.fromLTRB(24, 28, 20, 8),
       child: Text(
         title,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 13,
           fontWeight: FontWeight.w500,
-          color: AppTheme.textSecondary,
+          color: AppTheme.textSecondaryOf(context),
           letterSpacing: 0.2,
         ),
       ),
@@ -529,7 +529,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                   padding: const EdgeInsets.only(left: 56),
                   child: Container(
                     height: 0.5,
-                    color: AppTheme.divider,
+                    color: AppTheme.dividerOf(context),
                   ),
                 ),
             ],
@@ -588,8 +588,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 children: [
                   Text(
                     title,
-                    style: const TextStyle(
-                      color: AppTheme.textPrimary,
+                    style: TextStyle(
+                      color: AppTheme.textPrimaryOf(context),
                       fontSize: 15,
                       fontWeight: FontWeight.w400,
                     ),
@@ -598,8 +598,8 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                     const SizedBox(height: 2),
                     Text(
                       subtitle,
-                      style: const TextStyle(
-                        color: AppTheme.textSecondary,
+                      style: TextStyle(
+                        color: AppTheme.textSecondaryOf(context),
                         fontSize: 12,
                       ),
                     ),
@@ -615,7 +615,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 child: Text(
                   value,
                   style: TextStyle(
-                    color: valueColor ?? AppTheme.textSecondary,
+                    color: valueColor ?? AppTheme.textSecondaryOf(context),
                     fontSize: 14,
                     fontWeight: FontWeight.w400,
                   ),
