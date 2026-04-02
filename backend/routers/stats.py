@@ -2128,3 +2128,158 @@ async def get_watchlist_alerts(
     alerts.sort(key=lambda a: a["timestamp"], reverse=True)
 
     return {"alerts": alerts}
+
+
+# ── Leaderboard ──────────────────────────────────────────────────
+
+
+class LeaderboardItem(BaseModel):
+    symbol: str
+    name: str
+    market_type: str
+    total: int
+    correct: int
+    accuracy_pct: float
+
+
+class LeaderboardResponse(BaseModel):
+    top: list[LeaderboardItem]
+    bottom: list[LeaderboardItem]
+
+
+@router.get("/leaderboard", response_model=LeaderboardResponse)
+async def get_leaderboard(
+    min_settlements: int = Query(5, ge=1),
+    session: AsyncSession = Depends(get_session),
+) -> LeaderboardResponse:
+    """返回排行榜 — AI预测最准和最差的市场（需最少N次结算）。"""
+
+    # Per-market accuracy: count settlements grouped by market
+    stmt = (
+        select(
+            Market.symbol,
+            Market.name,
+            Market.market_type,
+            func.count(Settlement.id).label("total"),
+            func.sum(
+                func.cast(Settlement.is_correct == True, Integer)
+            ).label("correct"),
+        )
+        .join(Judgment, Judgment.market_id == Market.id)
+        .join(Settlement, Settlement.judgment_id == Judgment.id)
+        .where(Settlement.is_correct.isnot(None))
+        .group_by(Market.symbol, Market.name, Market.market_type)
+        .having(func.count(Settlement.id) >= min_settlements)
+    )
+    result = await session.execute(stmt)
+    rows = result.all()
+
+    items = []
+    for sym, name, mt, total, correct in rows:
+        correct_int = int(correct or 0)
+        pct = round(correct_int / total * 100, 1) if total > 0 else 0.0
+        items.append(LeaderboardItem(
+            symbol=sym, name=name, market_type=mt,
+            total=total, correct=correct_int, accuracy_pct=pct,
+        ))
+
+    # Sort by accuracy descending for top, ascending for bottom
+    sorted_desc = sorted(items, key=lambda x: x.accuracy_pct, reverse=True)
+    top = sorted_desc[:10]
+    bottom = sorted(items, key=lambda x: x.accuracy_pct)[:10]
+
+    return LeaderboardResponse(top=top, bottom=bottom)
+
+
+# ── Calibration Chart ────────────────────────────────────────────
+
+
+class CalibrationChartBucket(BaseModel):
+    bucket_label: str
+    bucket_low: float
+    bucket_high: float
+    predicted_avg: float
+    actual_hit_rate: float
+    count: int
+
+
+class CalibrationChartResponse(BaseModel):
+    buckets: list[CalibrationChartBucket]
+    perfect_line: list[dict]
+
+
+@router.get("/calibration-chart", response_model=CalibrationChartResponse)
+async def get_calibration_chart(
+    session: AsyncSession = Depends(get_session),
+) -> CalibrationChartResponse:
+    """返回校准图数据 — AI预测概率 vs 实际命中率（5个分桶）。"""
+
+    # Get all settled judgments with probability data
+    stmt = (
+        select(Judgment, Settlement)
+        .join(Settlement, Settlement.judgment_id == Judgment.id)
+        .where(Settlement.is_correct.isnot(None))
+    )
+    result = await session.execute(stmt)
+    rows = result.all()
+
+    # Define 5 buckets: 0-20%, 20-40%, 40-60%, 60-80%, 80-100%
+    buckets_def = [
+        ("0-20%", 0.0, 0.2),
+        ("20-40%", 0.2, 0.4),
+        ("40-60%", 0.4, 0.6),
+        ("60-80%", 0.6, 0.8),
+        ("80-100%", 0.8, 1.0),
+    ]
+
+    # For each judgment, compute the predicted probability for the actual direction
+    bucket_data: dict[str, list[tuple[float, bool]]] = {b[0]: [] for b in buckets_def}
+
+    for j, s in rows:
+        # Get the probability for the predicted direction
+        if j.direction == "up" and j.up_probability is not None:
+            pred_prob = j.up_probability
+        elif j.direction == "down" and j.down_probability is not None:
+            pred_prob = j.down_probability
+        elif j.direction == "flat" and j.flat_probability is not None:
+            pred_prob = j.flat_probability
+        else:
+            pred_prob = j.confidence_score
+
+        is_correct = bool(s.is_correct)
+
+        # Find the right bucket
+        for label, low, high in buckets_def:
+            if low <= pred_prob < high or (high == 1.0 and pred_prob == 1.0):
+                bucket_data[label].append((pred_prob, is_correct))
+                break
+
+    chart_buckets = []
+    for label, low, high in buckets_def:
+        entries = bucket_data[label]
+        count = len(entries)
+        if count > 0:
+            predicted_avg = sum(p for p, _ in entries) / count
+            actual_hit = sum(1 for _, c in entries if c) / count
+        else:
+            predicted_avg = (low + high) / 2
+            actual_hit = 0.0
+        chart_buckets.append(CalibrationChartBucket(
+            bucket_label=label,
+            bucket_low=low,
+            bucket_high=high,
+            predicted_avg=round(predicted_avg * 100, 1),
+            actual_hit_rate=round(actual_hit * 100, 1),
+            count=count,
+        ))
+
+    # Perfect calibration line reference points
+    perfect_line = [
+        {"x": 10.0, "y": 10.0},
+        {"x": 30.0, "y": 30.0},
+        {"x": 50.0, "y": 50.0},
+        {"x": 70.0, "y": 70.0},
+        {"x": 90.0, "y": 90.0},
+    ]
+
+    return CalibrationChartResponse(buckets=chart_buckets, perfect_line=perfect_line)

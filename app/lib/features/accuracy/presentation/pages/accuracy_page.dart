@@ -196,6 +196,15 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
         ref.invalidate(accuracyHistoryProvider);
         ref.invalidate(brierScoreProvider);
         await ref.read(accuracyProvider.future);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('已更新'),
+              duration: Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       },
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -435,6 +444,15 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
       onRefresh: () async {
         ref.invalidate(accuracyProvider);
         await ref.read(accuracyProvider.future);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('已更新'),
+              duration: Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       },
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -487,7 +505,18 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
         ref.invalidate(biasReportProvider);
         ref.invalidate(metaInsightsProvider);
         ref.invalidate(evolutionTimelineProvider);
+        ref.invalidate(leaderboardProvider);
+        ref.invalidate(calibrationChartProvider);
         await ref.read(genomeStatusProvider.future);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('已更新'),
+              duration: Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       },
       child: ListView(
         padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -499,6 +528,16 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
 
           // AI Learning Rate
           _LearningRateSection(),
+
+          const SizedBox(height: 24),
+
+          // Leaderboard — top/bottom markets
+          const _LeaderboardSection(),
+
+          const SizedBox(height: 24),
+
+          // Calibration chart — predicted vs actual
+          const _CalibrationChartSection(),
 
           const SizedBox(height: 24),
 
@@ -2457,6 +2496,478 @@ class _GenomeStatusSection extends ConsumerWidget {
             ),
           ),
         ],
+      ),
+    );
+  }
+}
+
+
+// ═══════════════════════════════════════════════
+// Leaderboard Section — top/bottom markets
+// ═══════════════════════════════════════════════
+class _LeaderboardSection extends ConsumerWidget {
+  const _LeaderboardSection();
+
+  static const _typeLabels = {
+    'crypto': '加密货币',
+    'cn-equities': 'A股',
+    'us-equities': '美股',
+    'hk-equities': '港股',
+    'jp-equities': '日股',
+    'eu-equities': '欧股',
+    'global-indices': '全球指数',
+    'forex': '外汇',
+    'commodities': '大宗商品',
+    'macro': '宏观指标',
+    'etf': 'ETF基金',
+    'prediction-markets': '预测市场',
+  };
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dataAsync = ref.watch(leaderboardProvider);
+
+    return dataAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (data) {
+        final topList = (data['top'] as List<dynamic>?) ?? [];
+        final bottomList = (data['bottom'] as List<dynamic>?) ?? [];
+        if (topList.isEmpty && bottomList.isEmpty) {
+          return const SizedBox.shrink();
+        }
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF3CD),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Icon(Icons.emoji_events_rounded,
+                        size: 16, color: Color(0xFF856404)),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    '排行榜',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+
+              // Top 5
+              if (topList.isNotEmpty) ...[
+                const Text(
+                  'AI最擅长的市场',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...topList.take(5).toList().asMap().entries.map((entry) {
+                  final i = entry.key;
+                  final item = entry.value as Map<String, dynamic>;
+                  final symbol = item['symbol'] as String? ?? '';
+                  final pct = (item['accuracy_pct'] as num?)?.toDouble() ?? 0;
+                  final total = item['total'] as int? ?? 0;
+                  final mt = item['market_type'] as String? ?? '';
+                  final mtLabel = _typeLabels[mt] ?? mt;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        SizedBox(
+                          width: 20,
+                          child: Text(
+                            '${i + 1}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w600,
+                              color: i == 0
+                                  ? const Color(0xFF856404)
+                                  : AppTheme.textSecondary,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                symbol,
+                                style: const TextStyle(
+                                  fontSize: 13,
+                                  fontWeight: FontWeight.w600,
+                                  color: AppTheme.textPrimary,
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              Text(
+                                '$mtLabel  ($total次结算)',
+                                style: const TextStyle(
+                                  fontSize: 11,
+                                  color: AppTheme.textSecondary,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                        Text(
+                          '${pct.toStringAsFixed(1)}%',
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: pct >= 60
+                                ? AppTheme.upGreen
+                                : pct >= 45
+                                    ? const Color(0xFFFFCC00)
+                                    : AppTheme.downRed,
+                            fontFeatures: const [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+
+              if (topList.isNotEmpty && bottomList.isNotEmpty)
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 10),
+                  child: Divider(height: 1),
+                ),
+
+              // Bottom 5
+              if (bottomList.isNotEmpty) ...[
+                const Text(
+                  'AI需改进的市场',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondary,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                ...bottomList.take(5).toList().asMap().entries.map((entry) {
+                  final item = entry.value as Map<String, dynamic>;
+                  final symbol = item['symbol'] as String? ?? '';
+                  final pct = (item['accuracy_pct'] as num?)?.toDouble() ?? 0;
+                  final total = item['total'] as int? ?? 0;
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 6),
+                    child: Row(
+                      children: [
+                        const SizedBox(
+                          width: 20,
+                          child: Icon(Icons.warning_amber_rounded,
+                              size: 14, color: AppTheme.downRed),
+                        ),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            '$symbol ($total次)',
+                            style: const TextStyle(
+                              fontSize: 13,
+                              color: AppTheme.textPrimary,
+                            ),
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                        Text(
+                          '${pct.toStringAsFixed(1)}%',
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w700,
+                            color: AppTheme.downRed,
+                            fontFeatures: [FontFeature.tabularFigures()],
+                          ),
+                        ),
+                      ],
+                    ),
+                  );
+                }),
+              ],
+            ],
+          ),
+        );
+      },
+    );
+  }
+}
+
+
+// ═══════════════════════════════════════════════
+// Calibration Chart Section — predicted vs actual
+// ═══════════════════════════════════════════════
+class _CalibrationChartSection extends ConsumerWidget {
+  const _CalibrationChartSection();
+
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dataAsync = ref.watch(calibrationChartProvider);
+
+    return dataAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (data) {
+        final buckets = (data['buckets'] as List<dynamic>?) ?? [];
+        if (buckets.isEmpty) return const SizedBox.shrink();
+
+        // Check if we have any data points
+        final totalCount = buckets.fold<int>(
+            0, (sum, b) => sum + ((b as Map<String, dynamic>)['count'] as int? ?? 0));
+        if (totalCount == 0) return const SizedBox.shrink();
+
+        return Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: AppTheme.surface,
+            borderRadius: BorderRadius.circular(14),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 28,
+                    height: 28,
+                    decoration: BoxDecoration(
+                      color: AppTheme.primary.withValues(alpha: 0.12),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: const Icon(Icons.ssid_chart_rounded,
+                        size: 16, color: AppTheme.primary),
+                  ),
+                  const SizedBox(width: 10),
+                  const Text(
+                    '置信度校准图',
+                    style: TextStyle(
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              const Text(
+                '对角线=完美校准。AI说70%就应70%命中。',
+                style: TextStyle(
+                  fontSize: 11,
+                  color: AppTheme.textSecondary,
+                ),
+              ),
+              const SizedBox(height: 16),
+              SizedBox(
+                height: 200,
+                child: _buildCalibrationChart(buckets),
+              ),
+              const SizedBox(height: 12),
+              // Legend
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  _legendDot(AppTheme.primary, 'AI校准线'),
+                  const SizedBox(width: 16),
+                  _legendDot(AppTheme.flatGray, '完美校准'),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _legendDot(Color color, String label) {
+    return Row(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Container(
+          width: 8,
+          height: 8,
+          decoration: BoxDecoration(
+            color: color,
+            shape: BoxShape.circle,
+          ),
+        ),
+        const SizedBox(width: 4),
+        Text(
+          label,
+          style: const TextStyle(fontSize: 11, color: AppTheme.textSecondary),
+        ),
+      ],
+    );
+  }
+
+  Widget _buildCalibrationChart(List<dynamic> buckets) {
+    // Build spots for actual hit rate
+    final actualSpots = <FlSpot>[];
+    final bucketLabels = <String>[];
+
+    for (int i = 0; i < buckets.length; i++) {
+      final b = buckets[i] as Map<String, dynamic>;
+      final predAvg = (b['predicted_avg'] as num?)?.toDouble() ?? 0;
+      final actualHit = (b['actual_hit_rate'] as num?)?.toDouble() ?? 0;
+      final count = b['count'] as int? ?? 0;
+      final label = b['bucket_label'] as String? ?? '';
+      bucketLabels.add(label);
+
+      if (count > 0) {
+        actualSpots.add(FlSpot(predAvg, actualHit));
+      }
+    }
+
+    // Perfect calibration diagonal
+    final perfectSpots = [
+      const FlSpot(10, 10),
+      const FlSpot(30, 30),
+      const FlSpot(50, 50),
+      const FlSpot(70, 70),
+      const FlSpot(90, 90),
+    ];
+
+    return LineChart(
+      LineChartData(
+        minX: 0,
+        maxX: 100,
+        minY: 0,
+        maxY: 100,
+        gridData: FlGridData(
+          show: true,
+          drawVerticalLine: true,
+          horizontalInterval: 25,
+          verticalInterval: 25,
+          getDrawingHorizontalLine: (value) => FlLine(
+            color: const Color(0xFFF2F2F7),
+            strokeWidth: 1,
+          ),
+          getDrawingVerticalLine: (value) => FlLine(
+            color: const Color(0xFFF2F2F7),
+            strokeWidth: 1,
+          ),
+        ),
+        titlesData: FlTitlesData(
+          leftTitles: AxisTitles(
+            axisNameWidget: const Text('实际命中率%',
+                style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 30,
+              interval: 25,
+              getTitlesWidget: (value, meta) {
+                if (value == 0 || value == 25 || value == 50 ||
+                    value == 75 || value == 100) {
+                  return Text('${value.toInt()}',
+                      style: const TextStyle(
+                          fontSize: 10, color: AppTheme.textSecondary));
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+          bottomTitles: AxisTitles(
+            axisNameWidget: const Text('预测概率%',
+                style: TextStyle(fontSize: 10, color: AppTheme.textSecondary)),
+            sideTitles: SideTitles(
+              showTitles: true,
+              reservedSize: 22,
+              interval: 25,
+              getTitlesWidget: (value, meta) {
+                if (value == 0 || value == 25 || value == 50 ||
+                    value == 75 || value == 100) {
+                  return Text('${value.toInt()}',
+                      style: const TextStyle(
+                          fontSize: 10, color: AppTheme.textSecondary));
+                }
+                return const SizedBox.shrink();
+              },
+            ),
+          ),
+          topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false)),
+          rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false)),
+        ),
+        borderData: FlBorderData(
+          show: true,
+          border: const Border(
+            left: BorderSide(color: Color(0xFFE5E5EA)),
+            bottom: BorderSide(color: Color(0xFFE5E5EA)),
+          ),
+        ),
+        lineBarsData: [
+          // Perfect calibration diagonal (dashed reference)
+          LineChartBarData(
+            spots: perfectSpots,
+            isCurved: false,
+            color: AppTheme.flatGray,
+            barWidth: 1.5,
+            dotData: const FlDotData(show: false),
+            dashArray: [4, 4],
+          ),
+          // AI calibration line
+          if (actualSpots.length >= 2)
+            LineChartBarData(
+              spots: actualSpots,
+              isCurved: true,
+              curveSmoothness: 0.3,
+              color: AppTheme.primary,
+              barWidth: 2.5,
+              dotData: FlDotData(
+                show: true,
+                getDotPainter: (spot, percent, barData, index) {
+                  return FlDotCirclePainter(
+                    radius: 4,
+                    color: AppTheme.primary,
+                    strokeWidth: 2,
+                    strokeColor: Colors.white,
+                  );
+                },
+              ),
+              belowBarData: BarAreaData(
+                show: true,
+                color: AppTheme.primary.withValues(alpha: 0.08),
+              ),
+            ),
+        ],
+        lineTouchData: LineTouchData(
+          touchTooltipData: LineTouchTooltipData(
+            getTooltipItems: (touchedSpots) {
+              return touchedSpots.map((spot) {
+                if (spot.barIndex == 0) return null; // skip diagonal
+                return LineTooltipItem(
+                  '预测${spot.x.toStringAsFixed(0)}% 实际${spot.y.toStringAsFixed(0)}%',
+                  const TextStyle(
+                    fontSize: 11,
+                    color: Colors.white,
+                    fontWeight: FontWeight.w500,
+                  ),
+                );
+              }).toList();
+            },
+          ),
+        ),
       ),
     );
   }

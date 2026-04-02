@@ -76,3 +76,17 @@ final evolutionTimelineProvider =
   final repo = ref.watch(accuracyRepositoryProvider);
   return repo.fetchEvolutionTimeline();
 });
+
+/// Provides leaderboard data (top/bottom markets by accuracy).
+final leaderboardProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchLeaderboard();
+});
+
+/// Provides calibration chart data (5-bucket).
+final calibrationChartProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchCalibrationChart();
+});

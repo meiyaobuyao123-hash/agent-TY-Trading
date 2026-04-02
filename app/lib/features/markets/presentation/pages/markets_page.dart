@@ -189,6 +189,15 @@ class _MarketsPageState extends ConsumerState<MarketsPage>
       onRefresh: () async {
         ref.invalidate(marketsProvider);
         await ref.read(marketsProvider.future);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('已更新'),
+              duration: Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       },
       child: CustomScrollView(
         slivers: [

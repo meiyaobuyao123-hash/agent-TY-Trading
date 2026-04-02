@@ -27,6 +27,9 @@ class Settings(BaseSettings):
     # ── API Keys (data sources) ──
     FRED_API_KEY: str = ""
 
+    # ── API Key for trigger endpoint ──
+    API_KEY: str = "ty-2026-secret-key"
+
     # ── Scheduler ──
     SCHEDULER_ENABLED: bool = True
 

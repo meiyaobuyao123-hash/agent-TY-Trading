@@ -5,13 +5,14 @@ from __future__ import annotations
 from typing import Optional
 from uuid import UUID
 
-from fastapi import APIRouter, Depends, HTTPException, Query, Request
+from fastapi import APIRouter, Depends, Header, HTTPException, Query, Request
 from sqlalchemy import select, func
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload
 
 from backend.database import get_session
 from backend.models import Judgment, Market, Settlement
+from backend.config import settings
 from backend.schemas import JudgmentOut, JudgmentTriggerRequest, JudgmentTriggerResponse
 from backend.services.judgment_service import trigger_judgment_cycle
 
@@ -178,8 +179,13 @@ async def trigger_judgments(
     body: JudgmentTriggerRequest,
     request: Request,
     session: AsyncSession = Depends(get_session),
+    x_api_key: Optional[str] = Header(None),
 ) -> JudgmentTriggerResponse:
-    """Manually trigger an AI judgment cycle."""
+    """Manually trigger an AI judgment cycle. Requires API key via X-API-Key header."""
+    # API key validation
+    if settings.API_KEY and x_api_key != settings.API_KEY:
+        raise HTTPException(status_code=403, detail="无效的API密钥")
+
     import time
     global _last_trigger_time
     now = time.time()

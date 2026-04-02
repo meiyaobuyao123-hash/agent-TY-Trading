@@ -127,8 +127,11 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
 
     try {
       final dio = ref.read(dioProvider);
-      final response =
-          await dio.post('/judgments/trigger', data: {'horizon_hours': 4});
+      final response = await dio.post(
+        '/judgments/trigger',
+        data: {'horizon_hours': 4},
+        options: Options(headers: {'X-API-Key': 'ty-2026-secret-key'}),
+      );
       final triggered = response.data['triggered'] ?? 0;
       setState(() {
         _triggerResult = '成功触发 $triggered 个判断';

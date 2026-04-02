@@ -117,6 +117,15 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
         ref.invalidate(overviewStatsProvider);
         ref.invalidate(insightsProvider);
         await ref.read(latestJudgmentsProvider.future);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('已更新'),
+              duration: Duration(seconds: 1),
+              behavior: SnackBarBehavior.floating,
+            ),
+          );
+        }
       },
       child: ListView(
         physics: const AlwaysScrollableScrollPhysics(),

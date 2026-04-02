@@ -52,6 +52,15 @@ class MarketDetailPage extends ConsumerWidget {
               ref.invalidate(marketJudgmentsProvider(symbol));
               ref.invalidate(marketSnapshotsProvider(symbol));
               await ref.read(marketDetailProvider(symbol).future);
+              if (context.mounted) {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('已更新'),
+                    duration: Duration(seconds: 1),
+                    behavior: SnackBarBehavior.floating,
+                  ),
+                );
+              }
             },
             child: CustomScrollView(
               slivers: [

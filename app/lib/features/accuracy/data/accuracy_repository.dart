@@ -81,4 +81,16 @@ class AccuracyRepository {
     final data = response.data as List<dynamic>;
     return data.cast<Map<String, dynamic>>();
   }
+
+  /// Fetch leaderboard (top/bottom markets by accuracy).
+  Future<Map<String, dynamic>> fetchLeaderboard() async {
+    final response = await _dio.get('/stats/leaderboard');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Fetch calibration chart data (5-bucket predicted vs actual).
+  Future<Map<String, dynamic>> fetchCalibrationChart() async {
+    final response = await _dio.get('/stats/calibration-chart');
+    return response.data as Map<String, dynamic>;
+  }
 }
