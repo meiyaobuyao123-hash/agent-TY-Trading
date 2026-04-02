@@ -13,3 +13,24 @@ final latestJudgmentsProvider = FutureProvider<List<Judgment>>((ref) async {
   final repo = ref.watch(dashboardRepositoryProvider);
   return repo.fetchLatestJudgments();
 });
+
+/// Provides system overview stats for the AI evolution card.
+final overviewStatsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return repo.fetchOverviewStats();
+});
+
+/// Provides AI insights for the dashboard.
+final insightsProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return repo.fetchInsights();
+});
+
+/// Provides alerts for notification badge.
+final alertsProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return repo.fetchAlerts();
+});

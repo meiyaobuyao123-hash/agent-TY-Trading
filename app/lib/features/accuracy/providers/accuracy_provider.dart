@@ -14,6 +14,13 @@ final accuracyProvider = FutureProvider<List<AccuracyStat>>((ref) async {
   return repo.fetchAccuracy();
 });
 
+/// Provides accuracy history for trend chart.
+final accuracyHistoryProvider =
+    FutureProvider<List<AccuracyHistoryItem>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchAccuracyHistory();
+});
+
 /// Provides calibration curve data.
 final calibrationProvider =
     FutureProvider<List<CalibrationPoint>>((ref) async {

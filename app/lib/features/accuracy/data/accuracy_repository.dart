@@ -26,6 +26,15 @@ class AccuracyRepository {
         .toList();
   }
 
+  /// Fetch accuracy history (trend over time).
+  Future<List<AccuracyHistoryItem>> fetchAccuracyHistory() async {
+    final response = await _dio.get('/stats/accuracy-history');
+    final List<dynamic> data = response.data as List<dynamic>;
+    return data
+        .map((a) => AccuracyHistoryItem.fromJson(a as Map<String, dynamic>))
+        .toList();
+  }
+
   /// Fetch calibration curve data.
   Future<List<CalibrationPoint>> fetchCalibration() async {
     final response = await _dio.get('/accuracy/calibration');

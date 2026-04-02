@@ -13,6 +13,8 @@ class TYApp extends StatelessWidget {
       title: '天演',
       debugShowCheckedModeBanner: false,
       theme: AppTheme.lightTheme,
+      darkTheme: AppTheme.darkTheme,
+      themeMode: ThemeMode.system,
       routerConfig: appRouter,
     );
   }

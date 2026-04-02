@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+import time
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
@@ -18,6 +19,7 @@ from backend.plugins.data_sources.akshare_cn import AKShareDataSource
 from backend.plugins.data_sources.fred_macro import FredMacroDataSource
 from backend.plugins.data_sources.frankfurter_fx import FrankfurterFXDataSource
 from backend.plugins.data_sources.polymarket_gamma import PolymarketGammaDataSource
+from backend.plugins.data_sources.yfinance_global import YFinanceDataSource
 from backend.plugins.reasoning.ai_consensus import AIConsensusPlugin
 from backend.plugins.bias_detectors.deviation_calc import DeviationCalculator
 from backend.plugins.evolution.accuracy_tracker import AccuracyTrackerPlugin
@@ -40,6 +42,7 @@ async def lifespan(app: FastAPI):
     pm.register_data_source(FredMacroDataSource())
     pm.register_data_source(FrankfurterFXDataSource())
     pm.register_data_source(PolymarketGammaDataSource())
+    pm.register_data_source(YFinanceDataSource())
 
     # Register reasoning
     pm.register_reasoning(AIConsensusPlugin())
@@ -56,6 +59,8 @@ async def lifespan(app: FastAPI):
     }
     await pm.initialize_all(config)
     app.state.plugin_manager = pm
+    app.state.start_time = time.time()
+    app.state.last_cycle_time = None
 
     # ── Scheduler ──
     if settings.SCHEDULER_ENABLED:
@@ -66,6 +71,7 @@ async def lifespan(app: FastAPI):
             async with async_session_maker() as session:
                 from backend.services.judgment_service import trigger_judgment_cycle
                 await trigger_judgment_cycle(session, pm)
+            app.state.last_cycle_time = time.time()
 
         async def _settlement():
             from backend.database import async_session_maker
@@ -100,7 +106,7 @@ def create_app() -> FastAPI:
     app = FastAPI(
         title="Project TY (天演) API",
         description="AI Financial World Model — Self-evolving judgment tracker",
-        version="0.1.0",
+        version="1.1.0",
         lifespan=lifespan,
     )
 
@@ -118,11 +124,13 @@ def create_app() -> FastAPI:
     from backend.routers.markets import router as markets_router
     from backend.routers.judgments import router as judgments_router
     from backend.routers.accuracy import router as accuracy_router
+    from backend.routers.stats import router as stats_router
 
     app.include_router(health_router)
     app.include_router(markets_router)
     app.include_router(judgments_router)
     app.include_router(accuracy_router)
+    app.include_router(stats_router)
 
     return app
 

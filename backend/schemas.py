@@ -71,6 +71,7 @@ class JudgmentOut(BaseModel):
     deviation_pct: Optional[float] = None
     reasoning: Optional[str] = None
     model_votes: Optional[list[dict]] = None
+    quality_score: Optional[float] = None
     horizon_hours: int = 4
     expires_at: Optional[datetime] = None
     created_at: datetime

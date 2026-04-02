@@ -1,176 +1,191 @@
-<!-- Badges -->
-[![Build Status](https://img.shields.io/github/actions/workflow/status/ty-trading/ty/ci.yml?branch=main&style=flat-square)](https://github.com/ty-trading/ty/actions)
+# 天演 TY — 自进化AI金融世界模型
+
+> Self-evolving AI Financial World Model
+
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg?style=flat-square)](LICENSE)
-[![Contributors](https://img.shields.io/github/contributors/ty-trading/ty?style=flat-square)](https://github.com/ty-trading/ty/graphs/contributors)
-[![Stars](https://img.shields.io/github/stars/ty-trading/ty?style=flat-square)](https://github.com/ty-trading/ty/stargazers)
-
-<div align="center">
-
-# TY (天演) -- Self-Evolving Financial World Model
-
-**An open-source, self-evolving AI system that perceives, reasons about, and trades across ALL financial markets from mathematical first principles.**
-
-[Architecture Blueprint](docs/world-model-blueprint.md) | [Plugin Architecture](docs/open-architecture.md) | [Free Data Sources](docs/free-data-sources-research.md) | [Contributing](CONTRIBUTING.md) | [中文文档](README_zh.md)
-
-</div>
 
 ---
 
-## Why TY?
+## 愿景
 
-Most trading systems are curve-fitted pipelines: scrape data, train model, deploy, watch it decay. TY takes a fundamentally different approach.
-
-**Markets are information processing systems.** A price is not a fact -- it is the compressed output of millions of agents updating beliefs under uncertainty. TY models this from first principles using three mathematical frameworks:
-
-- **Information Theory** -- Profit comes from correctly estimating surprisal before the market does. Your edge is the KL-divergence between your posterior and the market's.
-- **Game Theory** -- Prices are Nash equilibria of strategic behavior under incomplete information, not "correct" values. The system models recursive belief structures (what others believe about what others believe).
-- **Bayesian Inference** -- Explicit probability distributions, never point estimates. Priors over model uncertainty. Beliefs updated via Bayes' rule as evidence arrives.
-
-TY does not predict prices. It maintains a **world model** -- a causal graph of how economies, markets, and participants interact -- and continuously evolves that model as the world changes. When the model's beliefs diverge from market prices, that divergence is edge.
-
-The name "天演" (Tianyan) means "Natural Evolution" -- the system evolves its understanding just as nature evolves organisms: through variation, selection, and adaptation.
+天演（TY）是一个开源的自进化AI金融分析系统。它持续感知全球市场、生成方向性判断、追踪自身准确率，并通过反馈循环不断进化。系统名称取自"天演论"（自然进化），寓意AI通过不断学习和适应来提升自身对市场的理解。
 
 ---
 
-## 4-Layer Architecture
+## 系统架构
 
 ```
 ┌─────────────────────────────────────────────────────────┐
-│  Layer 4: SELF-EVOLVER                                  │
-│  Strategy genome · Natural selection · Meta-cognition   │
-│  Calibration tracking · Fitness evaluation              │
+│  第4层: 自进化引擎 (SELF-EVOLVER)                        │
+│  准确率追踪 · 置信度自校准 · 从错误中学习               │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 3: COGNITIVE BIAS HUNTER                         │
-│  Herding detection · Anchoring bias · Recency bias ·    │
-│  Overconfidence · Rational price divergence analysis    │
+│  第3层: 偏差检测器 (BIAS DETECTOR)                       │
+│  价格偏差计算 · 合理价格对比 · 偏差信号生成              │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 2: CAUSAL REASONING ENGINE                       │
-│  Causal DAGs · Bayesian updating · Game-theoretic       │
-│  modeling · Regime detection · Reflexivity analysis     │
+│  第2层: AI推理引擎 (REASONING ENGINE)                    │
+│  DeepSeek多模型共识 · 方向判断 · 中文市场分析            │
 ├─────────────────────────────────────────────────────────┤
-│  Layer 1: WORLD PERCEIVER                               │
-│  On-chain data · Order flow · Social sentiment ·        │
-│  Economic indicators · News · Prediction markets        │
+│  第1层: 世界感知器 (WORLD PERCEIVER)                     │
+│  Binance · AKShare · YFinance/Stooq · Frankfurter ·     │
+│  Polymarket · FRED                                      │
 └─────────────────────────────────────────────────────────┘
 ```
 
-| Layer | Purpose | Key Technologies |
+| 层级 | 功能 | 插件 |
 |---|---|---|
-| **World Perceiver** | Ingest and normalize data from all markets | DeFiLlama, Binance WS, FRED, AKShare, Polymarket, Dune |
-| **Causal Reasoning Engine** | Maintain causal understanding and generate hypotheses | Bayesian networks, causal DAGs, probabilistic programming |
-| **Cognitive Bias Hunter** | Detect cognitive biases in market pricing | Bias detectors, rational price models, divergence analysis |
-| **Self-Evolver** | Evolve strategies and self-improve over time | Genetic algorithms, meta-cognition, calibration tracking |
+| **世界感知器** | 从6个数据源获取全球市场数据 | Binance, AKShare, YFinance/Stooq, Frankfurter, Polymarket, FRED |
+| **AI推理引擎** | 多模型共识判断方向与置信度 | DeepSeek（可扩展 GPT-4o, Gemini） |
+| **偏差检测器** | 计算市场价格与AI合理价格的偏差 | 偏差计算器 |
+| **自进化引擎** | 追踪准确率，自动结算判断 | 准确率追踪器 |
 
 ---
 
-## Quick Start
+## 功能特性
 
-### Prerequisites
+- **108个全球市场覆盖** — 加密货币 / 美股 / 港股 / A股 / 外汇 / 商品 / 指数 / 宏观指标 / 预测市场
+- **6个数据源** — Binance, AKShare, YFinance/Stooq, Frankfurter, Polymarket, FRED
+- **AI多模型共识判断** — 当前: DeepSeek；架构支持 GPT-4o, Gemini 并行调用
+- **自进化反馈循环** — 判断到期后自动结算，从错误中学习，置信度自校准
+- **中文AI分析** — 所有推理和分析均以中文输出，市场类型专属分析策略
+- **准确率追踪** — 分市场类型统计准确率，进化趋势可视化
+- **AI洞察** — 最高置信信号、最大偏差、连续正确记录
+- **开放插件架构** — 可贡献自定义数据源和AI模型插件
+- **Apple风格iOS App** — Flutter构建，极简白底中文界面
 
-- Python 3.11+ (core engine)
-- Node.js 20+ (optional, for TypeScript plugins)
-- Git
+---
 
-### Installation
+## 快速开始
+
+### 后端开发
 
 ```bash
-# Clone the repository
-git clone https://github.com/ty-trading/ty.git
-cd ty
+# 克隆仓库
+git clone https://github.com/project-ty/tianyan.git
+cd tianyan
 
-# Create virtual environment
+# 创建虚拟环境
 python -m venv .venv
-source .venv/bin/activate  # Windows: .venv\Scripts\activate
+source .venv/bin/activate
 
-# Install dependencies
-pip install -r requirements.txt
+# 安装依赖
+pip install -r backend/requirements.txt
 
-# Copy environment template
+# 配置环境变量
 cp .env.example .env
-# Edit .env with your API keys (most data sources are free)
+# 编辑 .env 填入:
+#   DATABASE_URL=postgresql+asyncpg://user:pass@localhost:5432/dbname
+#   DEEPSEEK_API_KEY=your_key
+#   FRED_API_KEY=your_key (可选)
+
+# 创建数据库 schema 和种子数据
+psql -f infra/schema.sql
+psql -f infra/seed_markets.sql
+
+# 启动后端
+uvicorn backend.main:app --host 0.0.0.0 --port 8003 --reload
 ```
 
-### Run Your First Analysis
+### Flutter App 开发
 
 ```bash
-# Start the perception layer (data ingestion)
-python -m ty.perception.start
+cd app
 
-# Run the world model update
-python -m ty.world_model.update
+# 安装依赖
+flutter pub get
 
-# Generate trading signals
-python -m ty.reasoning.signals
+# 修改 API 地址（可选）
+# 编辑 lib/core/config/api_config.dart 中的 baseUrl
+
+# 运行
+flutter run
 ```
 
-### Configuration
+---
 
-All configuration lives in `config/`. Key files:
+## 插件开发
 
-| File | Purpose |
+### 添加数据源插件
+
+创建 `backend/plugins/data_sources/my_source.py`，继承 `DataSourcePlugin`:
+
+```python
+from backend.core.plugin_base import DataSourcePlugin
+from backend.core.types import DataQuery, MarketData, MarketType
+
+class MyDataSource(DataSourcePlugin):
+    name = "my-source"
+    display_name = "我的数据源"
+    markets = [MarketType.CRYPTO]
+
+    async def initialize(self, config: dict) -> None:
+        self.api_key = config.get("my_api_key", "")
+
+    async def fetch(self, query: DataQuery) -> list[MarketData]:
+        # 获取数据逻辑
+        return [...]
+
+    async def health_check(self) -> bool:
+        return True
+```
+
+然后在 `backend/main.py` 中注册:
+
+```python
+from backend.plugins.data_sources.my_source import MyDataSource
+pm.register_data_source(MyDataSource())
+```
+
+### 添加AI模型
+
+在 `backend/core/ai_client.py` 中添加新的 `_call_xxx()` 函数，然后将其加入 `call_all_models()` 的并行调用列表。
+
+详细指南参见 [CONTRIBUTING.md](CONTRIBUTING.md)。
+
+---
+
+## API 文档
+
+所有接口前缀: `/api/ty/`（通过 nginx 代理）
+
+| 方法 | 路径 | 说明 |
+|---|---|---|
+| GET | `/health` | 系统健康状态、插件状态、运行时间 |
+| GET | `/markets` | 所有跟踪市场列表（含最新快照） |
+| GET | `/markets/{symbol}` | 单个市场详情 |
+| GET | `/markets/{symbol}/snapshots` | 市场价格历史快照 |
+| GET | `/judgments/latest?brief=true` | 每个市场最新AI判断 |
+| GET | `/judgments?page=1&page_size=20` | 分页查询判断历史 |
+| GET | `/judgments/{id}` | 单个判断详情 |
+| POST | `/judgments/trigger` | 手动触发AI判断周期 |
+| GET | `/accuracy` | 分市场类型准确率统计 |
+| GET | `/stats/overview` | 系统总览（运行天数、总判断数、准确率） |
+| GET | `/stats/insights` | AI洞察（最高置信、最大偏差、连续正确） |
+| GET | `/stats/accuracy-history` | 准确率历史趋势数据 |
+
+---
+
+## 技术栈
+
+| 组件 | 技术 |
 |---|---|
-| `config/data_sources.yaml` | Enable/disable data sources, set API keys |
-| `config/world_model.yaml` | Causal graph structure, prior distributions |
-| `config/risk.yaml` | Position limits, drawdown thresholds, kill switches |
-| `config/execution.yaml` | Venue configuration, order types, slippage models |
+| 后端 | Python, FastAPI, PostgreSQL, SQLAlchemy (async), APScheduler |
+| 前端 | Flutter, Riverpod, fl_chart, go_router |
+| AI | DeepSeek（可扩展 GPT-4o, Gemini） |
+| 部署 | Ubuntu, systemd, nginx, rsync |
 
 ---
 
-## Documentation
+## 贡献
 
-| Document | Description |
-|---|---|
-| [Architecture Blueprint](docs/world-model-blueprint.md) | Complete system design with mathematical foundations |
-| [Architecture Blueprint (中文)](docs/world-model-blueprint-zh.md) | 完整系统设计与数学基础 |
-| [Free Data Sources Research](docs/free-data-sources-research.md) | Deep research on 30+ free data APIs |
-| [Free Data Sources (中文)](docs/free-data-sources-research-zh.md) | 30+ 免费数据 API 深度调研 |
-| [Open Plugin Architecture](docs/open-architecture.md) | Plugin system design (Python + TypeScript) |
-| [Contributing Guide](CONTRIBUTING.md) | How to contribute to TY |
-| [Contributing Guide (中文)](CONTRIBUTING_zh.md) | 如何贡献 TY 项目 |
+欢迎参与共建！请参阅 [CONTRIBUTING.md](CONTRIBUTING.md) 了解：
+
+- 如何添加数据源插件
+- 如何接入新的AI模型
+- 如何添加新市场
+- 开发环境搭建指南
 
 ---
 
-## How to Contribute
+## 许可证
 
-We welcome contributions from traders, researchers, and engineers. See [CONTRIBUTING.md](CONTRIBUTING.md) for the full guide.
-
-Quick overview:
-
-1. Fork the repo and create a feature branch
-2. Write tests for your changes
-3. Submit a PR with a clear description
-4. Respond to code review feedback
-
-Areas where we especially need help:
-
-- **Data plugins** -- connectors for new data sources
-- **Causal models** -- domain expertise in specific markets
-- **Backtesting** -- historical validation of strategies
-- **Documentation** -- tutorials, examples, translations
-
----
-
-## Roadmap
-
-- [x] Architecture blueprint
-- [x] Free data source research
-- [ ] World Perceiver (data ingestion framework)
-- [ ] Causal Reasoning Engine core (causal graph engine)
-- [ ] Cognitive Bias Hunter (bias detection system)
-- [ ] Self-Evolver (strategy evolution & paper trading)
-- [ ] Plugin system (community extensions)
-- [ ] Live trading (with safety guards)
-
----
-
-## License
-
-This project is licensed under the MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-<div align="center">
-
-**TY (天演)** -- Because markets evolve. Your trading system should too.
-
-</div>
+MIT License. 详见 [LICENSE](LICENSE)。

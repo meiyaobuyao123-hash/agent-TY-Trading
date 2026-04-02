@@ -43,6 +43,30 @@ class AccuracyStat {
   }
 }
 
+/// A single accuracy history data point for trend chart.
+class AccuracyHistoryItem {
+  final DateTime calculatedAt;
+  final double accuracyPct;
+  final int totalJudgments;
+  final int correctJudgments;
+
+  const AccuracyHistoryItem({
+    required this.calculatedAt,
+    required this.accuracyPct,
+    required this.totalJudgments,
+    required this.correctJudgments,
+  });
+
+  factory AccuracyHistoryItem.fromJson(Map<String, dynamic> json) {
+    return AccuracyHistoryItem(
+      calculatedAt: DateTime.parse(json['calculated_at'] as String),
+      accuracyPct: (json['accuracy_pct'] as num).toDouble(),
+      totalJudgments: json['total_judgments'] as int,
+      correctJudgments: json['correct_judgments'] as int,
+    );
+  }
+}
+
 /// A single point on the calibration curve.
 class CalibrationPoint {
   final String confidenceBucket;

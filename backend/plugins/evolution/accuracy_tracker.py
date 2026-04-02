@@ -7,7 +7,7 @@ import uuid
 from datetime import datetime, timedelta
 from typing import Optional
 
-from sqlalchemy import Integer, select, func, and_, case
+from sqlalchemy import Integer, select, func, and_, case, delete
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from backend.core.plugin_base import EvolutionPlugin
@@ -91,10 +91,10 @@ async def settle_judgments(session: AsyncSession) -> int:
             orig_price = orig_snap.price
             actual_price = latest_snap.price
 
-            # Determine actual direction
-            if actual_price > orig_price * 1.001:
+            # Determine actual direction (0.5% threshold to avoid noise)
+            if actual_price > orig_price * 1.005:
                 actual_direction = "up"
-            elif actual_price < orig_price * 0.999:
+            elif actual_price < orig_price * 0.995:
                 actual_direction = "down"
             else:
                 actual_direction = "flat"
@@ -143,6 +143,16 @@ async def recalculate_accuracy(session: AsyncSession) -> int:
     for mt in market_types:
         for period_name, delta in periods.items():
             cutoff = now - delta
+
+            # Delete existing stats for this market_type + period (upsert pattern)
+            await session.execute(
+                delete(AccuracyStat).where(
+                    and_(
+                        AccuracyStat.market_type == mt,
+                        AccuracyStat.period == period_name,
+                    )
+                )
+            )
 
             # Count total and correct settled judgments
             base_stmt = (

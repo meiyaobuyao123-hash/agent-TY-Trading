@@ -130,10 +130,43 @@ def _parse_json_response(text: str, model_name: str) -> Optional[dict]:
         }
 
 
+async def _call_deepseek(prompt: str, system: str = "") -> Optional[dict]:
+    """Call DeepSeek API (OpenAI-compatible)."""
+    if not settings.DEEPSEEK_API_KEY:
+        logger.warning("DEEPSEEK_API_KEY not set — skipping DeepSeek")
+        return None
+    try:
+        async with httpx.AsyncClient(timeout=60) as client:
+            messages = []
+            if system:
+                messages.append({"role": "system", "content": system})
+            messages.append({"role": "user", "content": prompt})
+            resp = await client.post(
+                "https://api.deepseek.com/v1/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
+                    "Content-Type": "application/json",
+                },
+                json={
+                    "model": "deepseek-chat",
+                    "messages": messages,
+                    "max_tokens": 1024,
+                    "temperature": 0.3,
+                },
+            )
+            resp.raise_for_status()
+            data = resp.json()
+            text = data["choices"][0]["message"]["content"]
+            return _parse_json_response(text, "deepseek")
+    except Exception:
+        logger.exception("DeepSeek API call failed")
+        return None
+
+
 async def call_all_models(prompt: str, system: str = "") -> list[dict]:
-    """Call Claude + GPT-4o + Gemini in parallel, return list of non-None results."""
+    """Call enabled AI models in parallel, return list of non-None results."""
     results = await asyncio.gather(
-        _call_claude(prompt, system),
+        _call_deepseek(prompt, system),
         _call_openai(prompt, system),
         _call_gemini(prompt, system),
         return_exceptions=True,

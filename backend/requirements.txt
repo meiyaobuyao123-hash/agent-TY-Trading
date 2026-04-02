@@ -19,6 +19,7 @@ apscheduler>=3.10,<4
 # ── Data sources ──
 akshare>=1.14,<2
 fredapi>=0.5,<1
+yfinance>=0.2.36,<1
 
 # ── AI clients ──
 anthropic>=0.25,<1

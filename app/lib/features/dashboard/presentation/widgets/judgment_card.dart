@@ -124,7 +124,7 @@ class JudgmentCard extends StatelessWidget {
                     ),
                   const SizedBox(height: 4),
                   Text(
-                    timeFormat.format(judgment.createdAt),
+                    timeFormat.format(judgment.createdAt.toLocal()),
                     style: const TextStyle(
                       color: AppTheme.flatGray,
                       fontSize: 11,

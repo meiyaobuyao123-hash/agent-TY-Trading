@@ -24,6 +24,24 @@ logger = logging.getLogger(__name__)
 SYMBOL_MAP = {
     "BTC-USD": "BTCUSDT",
     "ETH-USD": "ETHUSDT",
+    "SOL-USD": "SOLUSDT",
+    "BNB-USD": "BNBUSDT",
+    "XRP-USD": "XRPUSDT",
+    "ADA-USD": "ADAUSDT",
+    "DOGE-USD": "DOGEUSDT",
+    "AVAX-USD": "AVAXUSDT",
+    "DOT-USD": "DOTUSDT",
+    "LINK-USD": "LINKUSDT",
+    "MATIC-USD": "MATICUSDT",
+    "UNI-USD": "UNIUSDT",
+    "ATOM-USD": "ATOMUSDT",
+    "LTC-USD": "LTCUSDT",
+    "SUI-USD": "SUIUSDT",
+    "ARB-USD": "ARBUSDT",
+    "OP-USD": "OPUSDT",
+    "APT-USD": "APTUSDT",
+    "NEAR-USD": "NEARUSDT",
+    "FIL-USD": "FILUSDT",
 }
 
 REVERSE_MAP = {v: k for k, v in SYMBOL_MAP.items()}

@@ -22,6 +22,7 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     OPENAI_API_KEY: str = ""
     GOOGLE_API_KEY: str = ""
+    DEEPSEEK_API_KEY: str = ""
 
     # ── API Keys (data sources) ──
     FRED_API_KEY: str = ""

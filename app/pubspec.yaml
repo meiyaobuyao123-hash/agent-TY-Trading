@@ -37,6 +37,10 @@ dependencies:
   fl_chart: ^0.68.0
   intl: ^0.19.0
   shimmer: ^3.0.0
+  shared_preferences: ^2.2.3
+  url_launcher: ^6.2.5
+  share_plus: ^10.1.4
+  flutter_native_splash: ^2.4.0
 
 dev_dependencies:
   flutter_test:
@@ -59,6 +63,14 @@ flutter:
   # included with your application, so that you can use the icons in
   # the material Icons class.
   uses-material-design: true
+
+# Splash screen configuration — run: flutter pub run flutter_native_splash:create
+flutter_native_splash:
+  color: "#FFFFFF"
+  color_dark: "#000000"
+  image: "assets/splash_logo.png"
+  android: false
+  ios: true
 
   # To add assets to your application, add an assets section, like this:
   # assets:

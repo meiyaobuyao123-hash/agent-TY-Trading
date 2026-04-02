@@ -37,9 +37,9 @@ class MainScaffold extends StatelessWidget {
               label: '市场',
             ),
             BottomNavigationBarItem(
-              icon: Icon(Icons.insights_outlined),
-              activeIcon: Icon(Icons.insights),
-              label: '数据',
+              icon: Icon(Icons.auto_awesome_outlined),
+              activeIcon: Icon(Icons.auto_awesome),
+              label: '进化',
             ),
             BottomNavigationBarItem(
               icon: Icon(Icons.person_outline),

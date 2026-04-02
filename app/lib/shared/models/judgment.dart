@@ -37,6 +37,7 @@ class Judgment {
   final double? deviationPct;
   final String? reasoning;
   final List<ModelVote>? modelVotes;
+  final double? qualityScore;
   final int horizonHours;
   final DateTime? expiresAt;
   final DateTime createdAt;
@@ -54,6 +55,7 @@ class Judgment {
     this.deviationPct,
     this.reasoning,
     this.modelVotes,
+    this.qualityScore,
     required this.horizonHours,
     this.expiresAt,
     required this.createdAt,
@@ -80,6 +82,7 @@ class Judgment {
       deviationPct: (json['deviation_pct'] as num?)?.toDouble(),
       reasoning: json['reasoning'] as String?,
       modelVotes: votes,
+      qualityScore: (json['quality_score'] as num?)?.toDouble(),
       horizonHours: json['horizon_hours'] as int? ?? 4,
       expiresAt: json['expires_at'] != null
           ? DateTime.parse(json['expires_at'] as String)

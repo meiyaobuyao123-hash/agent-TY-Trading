@@ -25,6 +25,14 @@ FX_PAIRS = {
     "EUR/USD": ("EUR", "USD"),
     "GBP/USD": ("GBP", "USD"),
     "USD/JPY": ("USD", "JPY"),
+    "AUD/USD": ("AUD", "USD"),
+    "NZD/USD": ("NZD", "USD"),
+    "USD/CHF": ("USD", "CHF"),
+    "EUR/GBP": ("EUR", "GBP"),
+    "USD/CAD": ("USD", "CAD"),
+    "USD/HKD": ("USD", "HKD"),
+    "USD/SGD": ("USD", "SGD"),
+    "EUR/JPY": ("EUR", "JPY"),
 }
 
 

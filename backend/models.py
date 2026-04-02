@@ -15,6 +15,7 @@ from sqlalchemy import (
     DateTime,
     Float,
     ForeignKey,
+    Index,
     Integer,
     String,
     Text,
@@ -63,12 +64,15 @@ class Market(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     updated_at = Column(DateTime, default=datetime.utcnow, onupdate=datetime.utcnow)
 
-    snapshots = relationship("MarketSnapshot", back_populates="market")
-    judgments = relationship("Judgment", back_populates="market")
+    snapshots = relationship("MarketSnapshot", back_populates="market", lazy="selectin")
+    judgments = relationship("Judgment", back_populates="market", lazy="selectin")
 
 
 class MarketSnapshot(Base):
     __tablename__ = "market_snapshots"
+    __table_args__ = (
+        Index("ix_market_snapshots_market_captured", "market_id", "captured_at"),
+    )
 
     id = Column(UUIDString(), primary_key=True, default=uuid.uuid4)
     market_id = Column(UUIDString(), ForeignKey("markets.id"), nullable=False)
@@ -78,11 +82,14 @@ class MarketSnapshot(Base):
     raw_data = Column(JSON, nullable=True)
     captured_at = Column(DateTime, default=datetime.utcnow)
 
-    market = relationship("Market", back_populates="snapshots")
+    market = relationship("Market", back_populates="snapshots", lazy="selectin")
 
 
 class Judgment(Base):
     __tablename__ = "judgments"
+    __table_args__ = (
+        Index("ix_judgments_market_created", "market_id", "created_at"),
+    )
 
     id = Column(UUIDString(), primary_key=True, default=uuid.uuid4)
     market_id = Column(UUIDString(), ForeignKey("markets.id"), nullable=False)
@@ -94,17 +101,21 @@ class Judgment(Base):
     deviation_pct = Column(Float, nullable=True)
     reasoning = Column(Text, nullable=True)
     model_votes = Column(JSON, nullable=True)
+    quality_score = Column(Float, nullable=True)
     horizon_hours = Column(Integer, default=4)
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)
 
-    market = relationship("Market", back_populates="judgments")
-    snapshot = relationship("MarketSnapshot")
-    settlement = relationship("Settlement", back_populates="judgment", uselist=False)
+    market = relationship("Market", back_populates="judgments", lazy="selectin")
+    snapshot = relationship("MarketSnapshot", lazy="selectin")
+    settlement = relationship("Settlement", back_populates="judgment", uselist=False, lazy="selectin")
 
 
 class Settlement(Base):
     __tablename__ = "settlements"
+    __table_args__ = (
+        Index("ix_settlements_judgment_id", "judgment_id"),
+    )
 
     id = Column(UUIDString(), primary_key=True, default=uuid.uuid4)
     judgment_id = Column(UUIDString(), ForeignKey("judgments.id"), unique=True, nullable=False)
@@ -113,11 +124,14 @@ class Settlement(Base):
     is_correct = Column(Boolean, nullable=True)
     settled_at = Column(DateTime, default=datetime.utcnow)
 
-    judgment = relationship("Judgment", back_populates="settlement")
+    judgment = relationship("Judgment", back_populates="settlement", lazy="selectin")
 
 
 class AccuracyStat(Base):
     __tablename__ = "accuracy_stats"
+    __table_args__ = (
+        Index("ix_accuracy_stats_type_period_calc", "market_type", "period", "calculated_at"),
+    )
 
     id = Column(UUIDString(), primary_key=True, default=uuid.uuid4)
     market_type = Column(String(30), nullable=False)
