@@ -1792,7 +1792,7 @@ class _MetaInsightsSection extends ConsumerWidget {
                 ),
               ),
             ),
-            error: (_, __) => const Text(
+            error: (_, _) => const Text(
               '暂无元学习数据',
               style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
             ),
