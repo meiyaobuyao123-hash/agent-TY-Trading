@@ -26,6 +26,8 @@ class MarketType(str, Enum):
     ETF = "etf"
     KR_EQUITIES = "kr-equities"
     IN_EQUITIES = "in-equities"
+    LATAM_EQUITIES = "latam-equities"
+    MENA_EQUITIES = "mena-equities"
 
 
 class Timeframe(str, Enum):

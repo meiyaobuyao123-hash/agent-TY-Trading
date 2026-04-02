@@ -111,6 +111,26 @@ class JudgmentCard extends StatelessWidget {
                             fontWeight: FontWeight.w500,
                           ),
                         ),
+                        if (judgment.regime != null) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: _parseColor(judgment.regime!.color)
+                                  .withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              judgment.regime!.regime,
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: _parseColor(judgment.regime!.color),
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
                         if (isLow) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -179,6 +199,14 @@ class JudgmentCard extends StatelessWidget {
         ),
       ),
     );
+  }
+
+  Color _parseColor(String hex) {
+    final cleaned = hex.replaceFirst('#', '');
+    if (cleaned.length == 6) {
+      return Color(int.parse('FF$cleaned', radix: 16));
+    }
+    return AppTheme.flatGray;
   }
 
   Widget _buildSettlementDot() {

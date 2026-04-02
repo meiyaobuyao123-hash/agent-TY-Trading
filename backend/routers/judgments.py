@@ -37,6 +37,7 @@ def _judgment_to_out(j: Judgment, symbol: Optional[str] = None) -> JudgmentOut:
         flat_probability=j.flat_probability if hasattr(j, "flat_probability") else None,
         bias_flags=j.bias_flags if hasattr(j, "bias_flags") else None,
         is_low_confidence=j.is_low_confidence if hasattr(j, "is_low_confidence") else False,
+        regime=j.regime if hasattr(j, "regime") else None,
         horizon_hours=j.horizon_hours,
         expires_at=j.expires_at,
         created_at=j.created_at,

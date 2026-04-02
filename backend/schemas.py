@@ -77,6 +77,7 @@ class JudgmentOut(BaseModel):
     flat_probability: Optional[float] = None
     bias_flags: Optional[list[dict]] = None
     is_low_confidence: bool = False
+    regime: Optional[dict] = None
     horizon_hours: int = 4
     expires_at: Optional[datetime] = None
     created_at: datetime

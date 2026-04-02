@@ -118,6 +118,16 @@ CORRELATIONS: dict[str, list[str]] = {
     "INFY.IN": ["TCS.IN", "RELIANCE.IN"],
     "HDFCBANK.IN": ["RELIANCE.IN", "TCS.IN"],
     "BHARTIARTL.IN": ["RELIANCE.IN", "HDFCBANK.IN"],
+    # R18 — LATAM stocks
+    "MELI": ["AMZN", "NU", "SPX"],
+    "NU": ["MELI", "ITUB", "BBD"],
+    "PBR": ["XOM", "CVX", "VALE"],
+    "VALE": ["PBR", "BHP", "COPPER"],
+    "ITUB": ["BBD", "NU", "MELI"],
+    "BBD": ["ITUB", "NU"],
+    # R18 — Middle East / Africa
+    "2222.SR": ["OIL", "XOM", "CVX"],
+    "GFI": ["GOLD", "GLD"],
 }
 
 # Benchmark symbols per market type (used for cross-market context)
@@ -132,6 +142,8 @@ MARKET_BENCHMARKS: dict[str, list[str]] = {
     "etf": ["SPY", "QQQ"],
     "kr-equities": ["005930.KR"],
     "in-equities": ["RELIANCE.IN"],
+    "latam-equities": ["MELI", "VALE"],
+    "mena-equities": ["2222.SR"],
 }
 
 

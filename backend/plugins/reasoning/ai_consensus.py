@@ -156,6 +156,21 @@ MARKET_TYPE_CONTEXT = {
         "HDFC Bank是印度最大私营银行，Bharti Airtel是印度最大电信运营商。"
         "印度市场受益于人口红利和数字化转型，但需关注估值水平和地缘政治风险。"
     ),
+    "latam-equities": (
+        "这是拉丁美洲股票，多数在美国NYSE上市(ADR)。"
+        "关注拉美各国通胀率、利率周期、汇率波动和大宗商品价格(巴西铁矿石/石油、阿根廷农产品)。"
+        "MELI是拉美电商龙头(类似亚马逊)，NU是巴西最大数字银行。"
+        "PBR(巴西石油)与油价高度联动，VALE(淡水河谷)是全球最大铁矿石生产商。"
+        "ITUB/BBD是巴西最大银行，受巴西央行利率和汇率影响。"
+        "拉美市场波动性较大，政治风险和货币贬值是主要风险因素。"
+    ),
+    "mena-equities": (
+        "这是中东/非洲股票。"
+        "2222.SR(沙特阿美)是全球最大石油公司，利润直接与油价挂钩。"
+        "GFI(Gold Fields)是南非黄金矿业公司，股价与金价高度联动。"
+        "关注OPEC+产量政策、地缘政治风险(中东局势)和全球能源转型趋势。"
+        "新兴市场资金流向和美元强弱也会影响这些市场。"
+    ),
 }
 
 
@@ -171,6 +186,9 @@ def _build_prompt(
     genome_hint: str = "",
     tech_indicators_text: str = "",
     mcap_text: str = "",
+    propagation_text: str = "",
+    macro_text: str = "",
+    regime_text: str = "",
 ) -> str:
     """Build the prompt for AI models given market data."""
     price = market_data.get("price", "N/A")
@@ -243,6 +261,15 @@ def _build_prompt(
     # Market cap section (R14 crypto)
     mcap_section = f"\n{mcap_text}" if mcap_text else ""
 
+    # Signal propagation section (L2)
+    propagation_section = f"\n\n【信号传导】{propagation_text}" if propagation_text else ""
+
+    # Macro calendar section (L2)
+    macro_section = f"\n\n【宏观日历】\n{macro_text}" if macro_text else ""
+
+    # Market regime section (L2)
+    regime_section = f"\n{regime_text}" if regime_text else ""
+
     # Strategy genome section (L4 self-evolution)
     genome_section = f"\n\n{genome_hint}" if genome_hint else ""
 
@@ -253,7 +280,7 @@ def _build_prompt(
 当前价格: {price}
 24小时涨跌幅: {change}%
 24小时成交量: {volume}
-预测周期: {horizon_label}{type_section}{tech_section}{mcap_section}{history_section}{fear_greed_section}{breadth_section}{cross_market_section}{evolution_section}{genome_section}
+预测周期: {horizon_label}{type_section}{tech_section}{regime_section}{mcap_section}{history_section}{fear_greed_section}{breadth_section}{cross_market_section}{propagation_section}{macro_section}{evolution_section}{genome_section}
 
 请给出方向判断(up/down/flat)、置信度(0-1)、合理价格目标，以及简体中文的精炼分析。
 提醒: 如果技术指标未显示极端信号，且24h涨跌幅在噪声范围内，flat是合理选择。"""
@@ -442,11 +469,15 @@ class AIConsensusPlugin(ReasoningPlugin):
         genome_hint = context.get("genome_hint", "")
         tech_indicators_text = context.get("tech_indicators_text", "")
         mcap_text = context.get("mcap_text", "")
+        propagation_text = context.get("propagation_text", "")
+        macro_text = context.get("macro_text", "")
+        regime_text = context.get("regime_text", "")
 
         prompt = _build_prompt(
             symbol, market_data, horizon_hours, history_text,
             last_judgment, market_context, fear_greed, market_breadth,
             genome_hint, tech_indicators_text, mcap_text,
+            propagation_text, macro_text, regime_text,
         )
         raw_results = await call_all_models(prompt, system=SYSTEM_PROMPT)
 

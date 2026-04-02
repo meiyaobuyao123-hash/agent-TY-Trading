@@ -19,6 +19,9 @@ from sqlalchemy.orm import joinedload
 from backend.core.correlations import MARKET_BENCHMARKS, compute_quality_score
 from backend.core.plugin_manager import PluginManager
 from backend.core.types import DataQuery, MarketType, Timeframe
+from backend.core.signal_propagation import detect_propagation_signals
+from backend.core.macro_calendar import format_macro_events_for_prompt
+from backend.core.market_regime import detect_regime, format_regime_for_prompt, regime_to_dict
 from backend.models import Judgment, Market, MarketSnapshot, Settlement, AccuracyStat
 from backend.core.strategy_genome import get_best_genome, build_genome_prompt_hint
 from backend.plugins.bias_detectors.deviation_calc import calculate_deviation_pct
@@ -118,6 +121,8 @@ DATA_SOURCE_MAP = {
     "etf": "yfinance-global",
     "kr-equities": "yfinance-global",
     "in-equities": "yfinance-global",
+    "latam-equities": "yfinance-global",
+    "mena-equities": "yfinance-global",
 }
 
 # Different prediction horizons per market type
@@ -136,6 +141,8 @@ HORIZON_MAP = {
     "etf": 24,
     "kr-equities": 24,
     "in-equities": 24,
+    "latam-equities": 24,
+    "mena-equities": 24,
 }
 
 # Map market_type string to MarketType enum for DataQuery
@@ -154,6 +161,8 @@ _MARKET_TYPE_ENUM = {
     "etf": MarketType.ETF,
     "kr-equities": MarketType.KR_EQUITIES,
     "in-equities": MarketType.IN_EQUITIES,
+    "latam-equities": MarketType.LATAM_EQUITIES,
+    "mena-equities": MarketType.MENA_EQUITIES,
 }
 
 
@@ -493,6 +502,38 @@ async def _process_single_market(
             except Exception:
                 logger.debug("Failed to get mcap for %s", market.symbol)
 
+        # 4h. Signal propagation (L2)
+        propagation_text = ""
+        try:
+            prop_signal = detect_propagation_signals(
+                market.symbol, market.market_type, tick_cache
+            )
+            if prop_signal:
+                propagation_text = prop_signal
+        except Exception:
+            logger.debug("Failed signal propagation for %s", market.symbol)
+
+        # 4i. Macro calendar events (L2)
+        macro_text = ""
+        try:
+            macro_events = format_macro_events_for_prompt(market.market_type)
+            if macro_events:
+                macro_text = macro_events
+        except Exception:
+            logger.debug("Failed macro calendar for %s", market.symbol)
+
+        # 4j. Market regime detection (L2)
+        regime_text = ""
+        regime_data = None
+        try:
+            change_7d = tech_indicators.get("change_7d_pct")
+            rsi_val = tech_indicators.get("rsi_7")
+            regime_label = detect_regime(change_7d, rsi_val)
+            regime_text = format_regime_for_prompt(regime_label)
+            regime_data = regime_to_dict(regime_label)
+        except Exception:
+            logger.debug("Failed regime detection for %s", market.symbol)
+
         context = {
             "symbol": market.symbol,
             "market_data": tick_data,
@@ -505,6 +546,9 @@ async def _process_single_market(
             "market_breadth": market_breadth_ctx,
             "genome_hint": genome_hint,
             "mcap_text": mcap_text,
+            "propagation_text": propagation_text,
+            "macro_text": macro_text,
+            "regime_text": regime_text,
         }
         ai_result = await reasoning.analyze(context)
 
@@ -609,6 +653,7 @@ async def _process_single_market(
             flat_probability=ai_result.get("flat_probability"),
             bias_flags=bias_flags if bias_flags else None,
             is_low_confidence=is_low_confidence,
+            regime=regime_data,
             horizon_hours=market_horizon,
             expires_at=now + timedelta(hours=market_horizon),
             created_at=now,

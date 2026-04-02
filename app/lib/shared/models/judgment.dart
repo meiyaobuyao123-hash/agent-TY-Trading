@@ -25,6 +25,27 @@ class ModelVote {
   }
 }
 
+/// Market regime information.
+class MarketRegime {
+  final String regime;
+  final String description;
+  final String color;
+
+  const MarketRegime({
+    required this.regime,
+    required this.description,
+    required this.color,
+  });
+
+  factory MarketRegime.fromJson(Map<String, dynamic> json) {
+    return MarketRegime(
+      regime: json['regime'] as String? ?? '震荡',
+      description: json['description'] as String? ?? '',
+      color: json['color'] as String? ?? '#6b7280',
+    );
+  }
+}
+
 /// A single bias flag detected in an AI judgment.
 class BiasFlag {
   final String type;
@@ -67,6 +88,7 @@ class Judgment {
   final double? flatProbability;
   final List<BiasFlag>? biasFlags;
   final bool isLowConfidence;
+  final MarketRegime? regime;
   final int horizonHours;
   final DateTime? expiresAt;
   final DateTime createdAt;
@@ -90,6 +112,7 @@ class Judgment {
     this.flatProbability,
     this.biasFlags,
     this.isLowConfidence = false,
+    this.regime,
     required this.horizonHours,
     this.expiresAt,
     required this.createdAt,
@@ -112,6 +135,11 @@ class Judgment {
           .toList();
     }
 
+    MarketRegime? regime;
+    if (json['regime'] != null) {
+      regime = MarketRegime.fromJson(json['regime'] as Map<String, dynamic>);
+    }
+
     return Judgment(
       id: json['id'] as String,
       marketId: json['market_id'] as String,
@@ -129,6 +157,7 @@ class Judgment {
       flatProbability: (json['flat_probability'] as num?)?.toDouble(),
       biasFlags: biasFlags,
       isLowConfidence: json['is_low_confidence'] as bool? ?? false,
+      regime: regime,
       horizonHours: json['horizon_hours'] as int? ?? 4,
       expiresAt: json['expires_at'] != null
           ? DateTime.parse(json['expires_at'] as String)

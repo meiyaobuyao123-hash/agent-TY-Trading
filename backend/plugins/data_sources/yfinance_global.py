@@ -82,6 +82,11 @@ STOOQ_MAP = {
     # R17 — Indian stocks
     "RELIANCE.IN": "reliance.in", "TCS.IN": "tcs.in", "INFY.IN": "infy.in",
     "HDFCBANK.IN": "hdfcbank.in", "BHARTIARTL.IN": "bhartiartl.in",
+    # R18 — LATAM stocks (NYSE-listed)
+    "MELI": "meli.us", "NU": "nu.us", "PBR": "pbr.us",
+    "VALE": "vale.us", "ITUB": "itub.us", "BBD": "bbd.us",
+    # R18 — Middle East / Africa
+    "2222.SR": "2222.sr", "GFI": "gfi.us",
 }
 
 # yfinance symbol map (fallback)
@@ -133,6 +138,11 @@ YFINANCE_MAP = {
     # R17 — Indian stocks
     "RELIANCE.IN": "RELIANCE.NS", "TCS.IN": "TCS.NS", "INFY.IN": "INFY.NS",
     "HDFCBANK.IN": "HDFCBANK.NS", "BHARTIARTL.IN": "BHARTIARTL.NS",
+    # R18 — LATAM stocks (NYSE-listed)
+    "MELI": "MELI", "NU": "NU", "PBR": "PBR",
+    "VALE": "VALE", "ITUB": "ITUB", "BBD": "BBD",
+    # R18 — Middle East / Africa
+    "2222.SR": "2222.SR", "GFI": "GFI",
 }
 
 # Market type classification
@@ -165,6 +175,8 @@ JP_STOCKS = {"7203.JP", "6758.JP", "6861.JP", "9984.JP", "8306.JP"}
 EU_STOCKS = {"SAP.DE", "SIE.DE", "BMW.DE", "ASML.NL", "MC.PA", "TTE.PA"}
 KR_STOCKS = {"005930.KR", "000660.KR", "373220.KR", "005380.KR", "035420.KR"}
 IN_STOCKS = {"RELIANCE.IN", "TCS.IN", "INFY.IN", "HDFCBANK.IN", "BHARTIARTL.IN"}
+LATAM_STOCKS = {"MELI", "NU", "PBR", "VALE", "ITUB", "BBD"}
+MENA_STOCKS = {"2222.SR", "GFI"}
 
 
 def _market_type_for(symbol: str) -> MarketType:
@@ -182,6 +194,10 @@ def _market_type_for(symbol: str) -> MarketType:
         return MarketType.KR_EQUITIES
     if symbol in IN_STOCKS:
         return MarketType.IN_EQUITIES
+    if symbol in LATAM_STOCKS:
+        return MarketType.LATAM_EQUITIES
+    if symbol in MENA_STOCKS:
+        return MarketType.MENA_EQUITIES
     if symbol in INDICES:
         return MarketType.GLOBAL_INDICES
     if symbol in COMMODITIES:
@@ -218,6 +234,8 @@ class YFinanceDataSource(DataSourcePlugin):
             MarketType.IN_EQUITIES,
             MarketType.GLOBAL_INDICES,
             MarketType.COMMODITIES,
+            MarketType.LATAM_EQUITIES,
+            MarketType.MENA_EQUITIES,
         ]
 
     async def initialize(self, config: dict) -> None:
