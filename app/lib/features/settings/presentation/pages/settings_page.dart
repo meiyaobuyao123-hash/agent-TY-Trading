@@ -27,10 +27,19 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   List<_PluginInfo> _pluginList = [];
   bool _pluginsExpanded = false;
 
+  // Data coverage
+  int _totalMarkets = 0;
+  int _marketsWithData = 0;
+  double _coveragePct = 0.0;
+  List<_TypeCoverage> _typeCoverages = [];
+  bool _coverageLoading = true;
+  bool _coverageExpanded = false;
+
   @override
   void initState() {
     super.initState();
     _fetchHealth();
+    _fetchCoverage();
   }
 
   Future<void> _fetchHealth() async {
@@ -76,6 +85,36 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
         _backendVersion = '--';
         _pluginList = [];
         _healthLoading = false;
+      });
+    }
+  }
+
+  Future<void> _fetchCoverage() async {
+    setState(() => _coverageLoading = true);
+    try {
+      final dio = ref.read(dioProvider);
+      final response = await dio.get('/stats/data-coverage');
+      final data = response.data;
+      final byType = (data['by_type'] as List<dynamic>?) ?? [];
+
+      setState(() {
+        _totalMarkets = data['total_markets'] as int? ?? 0;
+        _marketsWithData = data['markets_with_data'] as int? ?? 0;
+        _coveragePct = (data['coverage_pct'] as num?)?.toDouble() ?? 0.0;
+        _typeCoverages = byType.map((t) {
+          final m = t as Map<String, dynamic>;
+          return _TypeCoverage(
+            marketType: m['market_type'] as String? ?? '',
+            total: m['total'] as int? ?? 0,
+            withData: m['with_data'] as int? ?? 0,
+            coveragePct: (m['coverage_pct'] as num?)?.toDouble() ?? 0.0,
+          );
+        }).toList();
+        _coverageLoading = false;
+      });
+    } catch (_) {
+      setState(() {
+        _coverageLoading = false;
       });
     }
   }
@@ -163,6 +202,109 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 value: _healthLoading ? '加载中...' : _aiModel,
               ),
             ]),
+
+            // ── Section: 数据覆盖率 ──
+            _sectionHeader('数据覆盖率'),
+            _groupedContainer([
+              _settingsRow(
+                icon: Icons.satellite_alt_rounded,
+                iconColor: const Color(0xFF10B981),
+                title: '实时数据',
+                value: _coverageLoading
+                    ? '加载中...'
+                    : '$_totalMarkets个市场中$_marketsWithData个有实时数据',
+              ),
+              _settingsRow(
+                icon: Icons.pie_chart_rounded,
+                iconColor: AppTheme.primary,
+                title: '覆盖率',
+                value: _coverageLoading
+                    ? '加载中...'
+                    : '${_coveragePct.toStringAsFixed(1)}%',
+                valueColor: _coveragePct >= 90
+                    ? AppTheme.upGreen
+                    : _coveragePct >= 70
+                        ? const Color(0xFFFFCC00)
+                        : AppTheme.downRed,
+              ),
+              _settingsRow(
+                icon: Icons.category_rounded,
+                iconColor: const Color(0xFF6366F1),
+                title: '按类型查看',
+                value: _coverageLoading
+                    ? '加载中...'
+                    : '${_typeCoverages.length} 个类型',
+                trailing: Icon(
+                  _coverageExpanded
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  color: AppTheme.flatGray,
+                  size: 20,
+                ),
+                onTap: () =>
+                    setState(() => _coverageExpanded = !_coverageExpanded),
+              ),
+            ]),
+
+            // Expanded coverage breakdown
+            if (_coverageExpanded && _typeCoverages.isNotEmpty)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 0, 16, 0),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: AppTheme.cardColorOf(context),
+                  borderRadius: const BorderRadius.only(
+                    bottomLeft: Radius.circular(12),
+                    bottomRight: Radius.circular(12),
+                  ),
+                ),
+                child: Column(
+                  children: _typeCoverages.map((t) {
+                    return Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 6),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              t.marketType,
+                              style: const TextStyle(
+                                fontSize: 13,
+                                color: AppTheme.textPrimary,
+                              ),
+                            ),
+                          ),
+                          Text(
+                            '${t.withData}/${t.total}',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          SizedBox(
+                            width: 48,
+                            child: Text(
+                              '${t.coveragePct.toStringAsFixed(0)}%',
+                              textAlign: TextAlign.right,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: t.coveragePct >= 90
+                                    ? AppTheme.upGreen
+                                    : t.coveragePct >= 70
+                                        ? const Color(0xFFFFCC00)
+                                        : AppTheme.downRed,
+                                fontWeight: FontWeight.w600,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ),
+                    );
+                  }).toList(),
+                ),
+              ),
 
             // ── Section: 操作 ──
             _sectionHeader('操作'),
@@ -473,4 +615,18 @@ class _PluginInfo {
   final bool healthy;
 
   _PluginInfo({required this.name, required this.healthy});
+}
+
+class _TypeCoverage {
+  final String marketType;
+  final int total;
+  final int withData;
+  final double coveragePct;
+
+  _TypeCoverage({
+    required this.marketType,
+    required this.total,
+    required this.withData,
+    required this.coveragePct,
+  });
 }

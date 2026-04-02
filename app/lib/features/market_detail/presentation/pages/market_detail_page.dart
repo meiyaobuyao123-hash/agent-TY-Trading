@@ -232,6 +232,19 @@ class MarketDetailPage extends ConsumerWidget {
                   ),
                 ),
 
+                // ── Section 2b: 判断准确率趋势 ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: judgmentsAsync.when(
+                      loading: () => const SizedBox.shrink(),
+                      error: (_, _) => const SizedBox.shrink(),
+                      data: (judgments) =>
+                          _buildAccuracyTrendChart(judgments),
+                    ),
+                  ),
+                ),
+
                 // ── Section 3: 价格走势 — chart ──
                 SliverToBoxAdapter(
                   child: Padding(
@@ -376,7 +389,7 @@ class MarketDetailPage extends ConsumerWidget {
 
     return statsAsync.when(
       loading: () => const SizedBox.shrink(),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (stats) {
         if (stats.isEmpty) return const SizedBox.shrink();
         final totalJ = stats['total_judgments'] as int? ?? 0;
@@ -679,6 +692,159 @@ class MarketDetailPage extends ConsumerWidget {
                   ),
                 ),
               ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  // ── Accuracy trend chart (mini line chart of rolling accuracy) ──
+  Widget _buildAccuracyTrendChart(List<Judgment> judgments) {
+    // Only show if there are 5+ settled judgments
+    final settled = judgments.where((j) => j.isSettled).toList();
+    if (settled.length < 5) return const SizedBox.shrink();
+
+    // Compute rolling accuracy (window of 5)
+    // settled is already ordered newest first, reverse for chronological
+    final chronological = settled.reversed.toList();
+    const windowSize = 5;
+    final rollingPoints = <FlSpot>[];
+
+    for (int i = windowSize - 1; i < chronological.length; i++) {
+      int correct = 0;
+      for (int w = i - windowSize + 1; w <= i; w++) {
+        if (chronological[w].isCorrect == true) correct++;
+      }
+      final acc = correct / windowSize * 100;
+      rollingPoints.add(FlSpot(
+        (i - windowSize + 1).toDouble(),
+        acc,
+      ));
+    }
+
+    if (rollingPoints.length < 2) return const SizedBox.shrink();
+
+    final lastAcc = rollingPoints.last.y;
+    final lineColor = lastAcc >= 50 ? AppTheme.upGreen : AppTheme.downRed;
+
+    return Container(
+      padding: const EdgeInsets.fromLTRB(16, 16, 16, 12),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              const Icon(Icons.insights_rounded,
+                  size: 16, color: AppTheme.textSecondary),
+              const SizedBox(width: 6),
+              const Text(
+                '判断准确率趋势',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                  letterSpacing: -0.2,
+                ),
+              ),
+              const Spacer(),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: lineColor.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  '${lastAcc.toStringAsFixed(0)}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.w600,
+                    color: lineColor,
+                  ),
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '基于最近${settled.length}个已验证判断 (滚动窗口$windowSize)',
+            style: const TextStyle(
+              fontSize: 11,
+              color: AppTheme.textSecondary,
+            ),
+          ),
+          const SizedBox(height: 12),
+          SizedBox(
+            height: 100,
+            child: LineChart(
+              LineChartData(
+                gridData: FlGridData(
+                  show: true,
+                  drawVerticalLine: false,
+                  horizontalInterval: 25,
+                  getDrawingHorizontalLine: (value) => FlLine(
+                    color: AppTheme.divider,
+                    strokeWidth: 0.5,
+                  ),
+                ),
+                titlesData: FlTitlesData(
+                  leftTitles: AxisTitles(
+                    sideTitles: SideTitles(
+                      showTitles: true,
+                      reservedSize: 32,
+                      interval: 25,
+                      getTitlesWidget: (value, meta) => Text(
+                        '${value.toInt()}%',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          color: AppTheme.flatGray,
+                        ),
+                      ),
+                    ),
+                  ),
+                  bottomTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  topTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                  rightTitles: const AxisTitles(
+                      sideTitles: SideTitles(showTitles: false)),
+                ),
+                borderData: FlBorderData(show: false),
+                minY: 0,
+                maxY: 100,
+                lineBarsData: [
+                  // 50% reference line
+                  LineChartBarData(
+                    spots: [
+                      FlSpot(rollingPoints.first.x, 50),
+                      FlSpot(rollingPoints.last.x, 50),
+                    ],
+                    color: AppTheme.flatGray.withValues(alpha: 0.3),
+                    barWidth: 1,
+                    dotData: const FlDotData(show: false),
+                    dashArray: [4, 4],
+                  ),
+                  // Accuracy trend line
+                  LineChartBarData(
+                    spots: rollingPoints,
+                    isCurved: true,
+                    curveSmoothness: 0.3,
+                    color: lineColor,
+                    barWidth: 2,
+                    isStrokeCapRound: true,
+                    dotData: const FlDotData(show: false),
+                    belowBarData: BarAreaData(
+                      show: true,
+                      color: lineColor.withValues(alpha: 0.08),
+                    ),
+                  ),
+                ],
+                lineTouchData: const LineTouchData(enabled: false),
+              ),
             ),
           ),
         ],

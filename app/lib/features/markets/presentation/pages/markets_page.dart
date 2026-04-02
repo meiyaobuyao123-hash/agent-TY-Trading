@@ -17,7 +17,11 @@ class MarketsPage extends ConsumerStatefulWidget {
   ConsumerState<MarketsPage> createState() => _MarketsPageState();
 }
 
-class _MarketsPageState extends ConsumerState<MarketsPage> {
+class _MarketsPageState extends ConsumerState<MarketsPage>
+    with AutomaticKeepAliveClientMixin {
+  @override
+  bool get wantKeepAlive => true;
+
   static const _typeLabels = {
     'crypto': '加密货币',
     'cn-equities': 'A股',
@@ -110,6 +114,7 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final markets = ref.watch(marketsProvider);
 
     return Scaffold(
@@ -652,7 +657,7 @@ class _GlobalViewSummary extends ConsumerWidget {
           ),
         ),
       ),
-      error: (_, __) => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
       data: (data) {
         final summaryText = data['summary_text'] as String? ?? '';
         if (summaryText.isEmpty) return const SizedBox.shrink();

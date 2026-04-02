@@ -27,6 +27,7 @@ class EnhancedHealthResponse(BaseModel):
     markets_with_recent_data: int = 0
     memory_mb: Optional[float] = None
     plugins: dict[str, dict[str, bool]] = {}
+    data_source_latency: dict[str, dict] = {}
 
 
 @router.get("/health", response_model=EnhancedHealthResponse)
@@ -77,6 +78,14 @@ async def health_check(
         except Exception:
             pass
 
+    # Data source latency stats
+    ds_latency: dict[str, dict] = {}
+    try:
+        from backend.services.judgment_service import get_ds_latency_stats
+        ds_latency = get_ds_latency_stats()
+    except Exception:
+        pass
+
     return EnhancedHealthResponse(
         status="ok",
         version="2.0.0",
@@ -86,4 +95,5 @@ async def health_check(
         markets_with_recent_data=markets_with_recent,
         memory_mb=memory_mb,
         plugins=plugin_health,
+        data_source_latency=ds_latency,
     )

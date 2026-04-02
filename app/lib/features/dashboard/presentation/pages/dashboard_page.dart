@@ -22,11 +22,15 @@ class DashboardPage extends ConsumerStatefulWidget {
   ConsumerState<DashboardPage> createState() => _DashboardPageState();
 }
 
-class _DashboardPageState extends ConsumerState<DashboardPage> {
+class _DashboardPageState extends ConsumerState<DashboardPage>
+    with AutomaticKeepAliveClientMixin {
   bool _showOnboarding = false;
   bool _onboardingChecked = false;
   bool _showAllSignals = false;
   static const int _initialSignalCount = 20;
+
+  @override
+  bool get wantKeepAlive => true;
 
   @override
   void initState() {
@@ -55,6 +59,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
   @override
   Widget build(BuildContext context) {
+    super.build(context); // Required for AutomaticKeepAliveClientMixin
     final judgments = ref.watch(latestJudgmentsProvider);
 
     return Scaffold(

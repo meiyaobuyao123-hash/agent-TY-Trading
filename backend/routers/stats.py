@@ -223,6 +223,77 @@ async def get_overview(
     )
 
 
+# ── Data Coverage ─────────────────────────────────────────────────────
+
+
+class MarketTypeCoverage(BaseModel):
+    market_type: str
+    total: int
+    with_data: int
+    coverage_pct: float
+
+
+class DataCoverageResponse(BaseModel):
+    total_markets: int
+    markets_with_data: int
+    coverage_pct: float
+    by_type: list[MarketTypeCoverage]
+
+
+@router.get("/data-coverage", response_model=DataCoverageResponse)
+async def get_data_coverage(
+    session: AsyncSession = Depends(get_session),
+) -> DataCoverageResponse:
+    """返回数据覆盖率 — 各市场类型有多少市场有实时数据。"""
+
+    # All active markets grouped by type
+    type_count_stmt = (
+        select(Market.market_type, func.count().label("cnt"))
+        .where(Market.is_active == True)
+        .group_by(Market.market_type)
+    )
+    type_count_result = await session.execute(type_count_stmt)
+    type_counts = {row[0]: row[1] for row in type_count_result.all()}
+
+    # Markets with at least one snapshot with non-null price, grouped by type
+    cutoff_24h = datetime.utcnow() - timedelta(hours=24)
+    with_data_stmt = (
+        select(Market.market_type, func.count(func.distinct(Market.id)).label("cnt"))
+        .join(MarketSnapshot, MarketSnapshot.market_id == Market.id)
+        .where(
+            Market.is_active == True,
+            MarketSnapshot.price.isnot(None),
+            MarketSnapshot.captured_at >= cutoff_24h,
+        )
+        .group_by(Market.market_type)
+    )
+    with_data_result = await session.execute(with_data_stmt)
+    with_data_counts = {row[0]: row[1] for row in with_data_result.all()}
+
+    total_markets = sum(type_counts.values())
+    total_with_data = sum(with_data_counts.values())
+    coverage_pct = round(total_with_data / total_markets * 100, 1) if total_markets > 0 else 0.0
+
+    by_type = []
+    for mt in sorted(type_counts.keys()):
+        total = type_counts[mt]
+        with_data = with_data_counts.get(mt, 0)
+        pct = round(with_data / total * 100, 1) if total > 0 else 0.0
+        by_type.append(MarketTypeCoverage(
+            market_type=mt,
+            total=total,
+            with_data=with_data,
+            coverage_pct=pct,
+        ))
+
+    return DataCoverageResponse(
+        total_markets=total_markets,
+        markets_with_data=total_with_data,
+        coverage_pct=coverage_pct,
+        by_type=by_type,
+    )
+
+
 class AccuracyHistoryItem(BaseModel):
     calculated_at: str
     accuracy_pct: float

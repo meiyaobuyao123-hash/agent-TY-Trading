@@ -31,6 +31,34 @@ from backend.plugins.data_sources.fear_greed import get_fear_greed_index
 
 logger = logging.getLogger(__name__)
 
+# ── Data source latency tracking ──────────────────────────────
+_ds_latency: dict[str, list[float]] = {}  # data_source_name -> list of latencies in ms
+_DS_LATENCY_MAX = 50  # keep last N measurements
+
+
+def record_ds_latency(ds_name: str, latency_ms: float) -> None:
+    """Record a data source fetch latency measurement."""
+    if ds_name not in _ds_latency:
+        _ds_latency[ds_name] = []
+    _ds_latency[ds_name].append(latency_ms)
+    if len(_ds_latency[ds_name]) > _DS_LATENCY_MAX:
+        _ds_latency[ds_name] = _ds_latency[ds_name][-_DS_LATENCY_MAX:]
+
+
+def get_ds_latency_stats() -> dict[str, dict]:
+    """Return average and last latency per data source."""
+    result: dict[str, dict] = {}
+    for ds_name, latencies in _ds_latency.items():
+        if latencies:
+            avg = sum(latencies) / len(latencies)
+            result[ds_name] = {
+                "avg_ms": round(avg, 1),
+                "last_ms": round(latencies[-1], 1),
+                "samples": len(latencies),
+            }
+    return result
+
+
 # ── Crypto market cap ranking cache ──────────────────────────────
 _mcap_cache: dict = {}
 _mcap_cache_ts: float = 0.0
@@ -771,6 +799,7 @@ async def trigger_judgment_cycle(
                     ),
                 }
             fetch_duration = time.time() - fetch_start
+            record_ds_latency(ds_name, fetch_duration * 1000)
             logger.info(
                 "Data source fetch complete",
                 extra={
