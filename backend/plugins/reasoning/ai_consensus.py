@@ -123,6 +123,9 @@ def _build_prompt(
     history_text: str = "",
     last_judgment: dict | None = None,
     market_context: dict | None = None,
+    fear_greed: dict | None = None,
+    market_breadth: dict | None = None,
+    genome_hint: str = "",
 ) -> str:
     """Build the prompt for AI models given market data."""
     price = market_data.get("price", "N/A")
@@ -171,6 +174,27 @@ def _build_prompt(
             f"\n请反思上次判断{'的成功经验' if last_judgment.get('is_correct') else '的失误原因'}，并据此改进本次分析。"
         )
 
+    # Fear & Greed section (crypto only)
+    fear_greed_section = ""
+    if fear_greed:
+        fng_value = fear_greed.get("value", 50)
+        fng_label = fear_greed.get("label", "中性")
+        fear_greed_section = f"\n加密市场恐慌贪婪指数: {fng_value} ({fng_label})"
+        if fng_value <= 25:
+            fear_greed_section += "\n注意: 极度恐慌通常是逆向买入机会，恐慌往往过度。"
+        elif fng_value >= 75:
+            fear_greed_section += "\n注意: 极度贪婪通常预示回调风险，贪婪往往过度。"
+
+    # Market breadth section
+    breadth_section = ""
+    if market_breadth:
+        mood = market_breadth.get("mood", "中性")
+        up_pct = market_breadth.get("up_pct", 50)
+        breadth_section = f"\n市场情绪广度: {up_pct:.0f}%市场上涨 — 情绪: {mood}"
+
+    # Strategy genome section (L4 self-evolution)
+    genome_section = f"\n\n{genome_hint}" if genome_hint else ""
+
     return f"""分析以下市场并预测未来 {horizon_label} 的方向。
 
 品种: {symbol}
@@ -178,7 +202,7 @@ def _build_prompt(
 当前价格: {price}
 24小时涨跌幅: {change}%
 24小时成交量: {volume}
-预测周期: {horizon_label}{type_section}{history_section}{cross_market_section}{evolution_section}
+预测周期: {horizon_label}{type_section}{history_section}{fear_greed_section}{breadth_section}{cross_market_section}{evolution_section}{genome_section}
 
 请给出方向判断(up/down/flat)、置信度(0-1)、合理价格目标，以及简体中文的精炼分析。"""
 
@@ -304,8 +328,16 @@ class AIConsensusPlugin(ReasoningPlugin):
         history_text = context.get("history_text", "")
         last_judgment = context.get("last_judgment")
         market_context = context.get("market_context")
+        fear_greed = context.get("fear_greed")
+        market_breadth = context.get("market_breadth")
 
-        prompt = _build_prompt(symbol, market_data, horizon_hours, history_text, last_judgment, market_context)
+        genome_hint = context.get("genome_hint", "")
+
+        prompt = _build_prompt(
+            symbol, market_data, horizon_hours, history_text,
+            last_judgment, market_context, fear_greed, market_breadth,
+            genome_hint,
+        )
         raw_results = await call_all_models(prompt, system=SYSTEM_PROMPT)
 
         votes = []

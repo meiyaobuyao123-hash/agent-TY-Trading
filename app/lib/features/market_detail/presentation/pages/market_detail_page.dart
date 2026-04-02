@@ -565,6 +565,57 @@ class MarketDetailPage extends ConsumerWidget {
             ),
           ],
         ),
+        // Bias flags warning cards
+        if (latest.biasFlags != null && latest.biasFlags!.isNotEmpty) ...[
+          const SizedBox(height: 14),
+          ...latest.biasFlags!.map((flag) => Padding(
+            padding: const EdgeInsets.only(bottom: 8),
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+              decoration: BoxDecoration(
+                color: flag.severity == 'high'
+                    ? const Color(0xFFFFF3CD)
+                    : const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(
+                  color: const Color(0xFFFFCC00).withValues(alpha: 0.3),
+                  width: 1,
+                ),
+              ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  const Text('\u26A0\uFE0F ', style: TextStyle(fontSize: 14)),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          flag.label,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            fontWeight: FontWeight.w600,
+                            color: Color(0xFF856404),
+                          ),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          flag.detail,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: Color(0xFF856404),
+                            height: 1.4,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          )),
+        ],
         // Reasoning card with left blue border — show full text
         if (latest.reasoning != null) ...[
           const SizedBox(height: 16),

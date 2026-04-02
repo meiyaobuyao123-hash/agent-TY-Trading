@@ -44,4 +44,22 @@ class AccuracyRepository {
         .map((p) => CalibrationPoint.fromJson(p as Map<String, dynamic>))
         .toList();
   }
+
+  /// Fetch bias report for cognitive bias analysis.
+  Future<Map<String, dynamic>> fetchBiasReport() async {
+    final response = await _dio.get('/stats/bias-report');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Fetch accuracy by hour of day.
+  Future<Map<String, dynamic>> fetchAccuracyByHour() async {
+    final response = await _dio.get('/stats/accuracy-by-hour');
+    return response.data as Map<String, dynamic>;
+  }
+
+  /// Fetch strategy genome status.
+  Future<Map<String, dynamic>> fetchGenomeStatus() async {
+    final response = await _dio.get('/stats/genome-status');
+    return response.data as Map<String, dynamic>;
+  }
 }

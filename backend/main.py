@@ -20,6 +20,7 @@ from backend.plugins.data_sources.fred_macro import FredMacroDataSource
 from backend.plugins.data_sources.frankfurter_fx import FrankfurterFXDataSource
 from backend.plugins.data_sources.polymarket_gamma import PolymarketGammaDataSource
 from backend.plugins.data_sources.yfinance_global import YFinanceDataSource
+from backend.plugins.data_sources.fear_greed import FearGreedDataSource
 from backend.plugins.reasoning.ai_consensus import AIConsensusPlugin
 from backend.plugins.bias_detectors.deviation_calc import DeviationCalculator
 from backend.plugins.evolution.accuracy_tracker import AccuracyTrackerPlugin
@@ -43,6 +44,7 @@ async def lifespan(app: FastAPI):
     pm.register_data_source(FrankfurterFXDataSource())
     pm.register_data_source(PolymarketGammaDataSource())
     pm.register_data_source(YFinanceDataSource())
+    pm.register_data_source(FearGreedDataSource())
 
     # Register reasoning
     pm.register_reasoning(AIConsensusPlugin())
@@ -61,6 +63,16 @@ async def lifespan(app: FastAPI):
     app.state.plugin_manager = pm
     app.state.start_time = time.time()
     app.state.last_cycle_time = None
+
+    # ── Strategy Genomes (L4 Self-Evolution) ──
+    try:
+        from backend.database import async_session_maker
+        from backend.core.strategy_genome import ensure_genomes_exist
+        async with async_session_maker() as session:
+            await ensure_genomes_exist(session)
+        logger.info("Strategy genomes initialized")
+    except Exception:
+        logger.warning("Failed to initialize strategy genomes — will retry later")
 
     # ── Scheduler ──
     if settings.SCHEDULER_ENABLED:
@@ -85,7 +97,15 @@ async def lifespan(app: FastAPI):
                 from backend.plugins.evolution.accuracy_tracker import recalculate_accuracy
                 await recalculate_accuracy(session)
 
-        register_jobs(scheduler, _judgment_cycle, _settlement, _accuracy)
+        async def _genome_evolution():
+            from backend.database import async_session_maker
+            async with async_session_maker() as session:
+                from backend.core.strategy_genome import evolve_genomes
+                result = await evolve_genomes(session)
+                if result:
+                    logger.info("Genome evolution completed: mutated %s", result)
+
+        register_jobs(scheduler, _judgment_cycle, _settlement, _accuracy, _genome_evolution)
         scheduler.start()
         app.state.scheduler = scheduler
         logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))

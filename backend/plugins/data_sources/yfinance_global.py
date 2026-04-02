@@ -66,6 +66,10 @@ STOOQ_MAP = {
     # Commodities
     "GOLD": "gc.f", "OIL": "cl.f", "SILVER": "si.f",
     "NATGAS": "ng.f", "COPPER": "hg.f",
+    # R12 expansion — more commodities
+    "PLATINUM": "pl.f", "PALLADIUM": "pa.f",
+    "WHEAT": "zw.f", "CORN": "zc.f", "SOYBEANS": "zs.f",
+    "COFFEE": "kc.f", "COTTON": "ct.f",
 }
 
 # yfinance symbol map (fallback)
@@ -101,6 +105,10 @@ YFINANCE_MAP = {
     "DAX": "^GDAXI", "CAC40": "^FCHI", "ASX200": "^AXJO",
     "GOLD": "GC=F", "OIL": "CL=F", "SILVER": "SI=F",
     "NATGAS": "NG=F", "COPPER": "HG=F",
+    # R12 expansion
+    "PLATINUM": "PL=F", "PALLADIUM": "PA=F",
+    "WHEAT": "ZW=F", "CORN": "ZC=F", "SOYBEANS": "ZS=F",
+    "COFFEE": "KC=F", "COTTON": "CT=F",
 }
 
 # Market type classification
@@ -125,7 +133,10 @@ HK_STOCKS = {
     "2318.HK", "0005.HK", "1299.HK", "9888.HK", "0941.HK",
 }
 INDICES = {"SPX", "IXIC", "DJI", "HSI", "N225", "FTSE", "DAX", "CAC40", "ASX200"}
-COMMODITIES = {"GOLD", "OIL", "SILVER", "NATGAS", "COPPER"}
+COMMODITIES = {
+    "GOLD", "OIL", "SILVER", "NATGAS", "COPPER",
+    "PLATINUM", "PALLADIUM", "WHEAT", "CORN", "SOYBEANS", "COFFEE", "COTTON",
+}
 
 
 def _market_type_for(symbol: str) -> MarketType:

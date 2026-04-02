@@ -25,6 +25,30 @@ class ModelVote {
   }
 }
 
+/// A single bias flag detected in an AI judgment.
+class BiasFlag {
+  final String type;
+  final String label;
+  final String detail;
+  final String severity;
+
+  const BiasFlag({
+    required this.type,
+    required this.label,
+    required this.detail,
+    required this.severity,
+  });
+
+  factory BiasFlag.fromJson(Map<String, dynamic> json) {
+    return BiasFlag(
+      type: json['type'] as String? ?? 'unknown',
+      label: json['label'] as String? ?? '',
+      detail: json['detail'] as String? ?? '',
+      severity: json['severity'] as String? ?? 'low',
+    );
+  }
+}
+
 /// An AI judgment record.
 class Judgment {
   final String id;
@@ -38,6 +62,8 @@ class Judgment {
   final String? reasoning;
   final List<ModelVote>? modelVotes;
   final double? qualityScore;
+  final List<BiasFlag>? biasFlags;
+  final bool isLowConfidence;
   final int horizonHours;
   final DateTime? expiresAt;
   final DateTime createdAt;
@@ -56,6 +82,8 @@ class Judgment {
     this.reasoning,
     this.modelVotes,
     this.qualityScore,
+    this.biasFlags,
+    this.isLowConfidence = false,
     required this.horizonHours,
     this.expiresAt,
     required this.createdAt,
@@ -71,6 +99,13 @@ class Judgment {
           .toList();
     }
 
+    List<BiasFlag>? biasFlags;
+    if (json['bias_flags'] != null) {
+      biasFlags = (json['bias_flags'] as List)
+          .map((f) => BiasFlag.fromJson(f as Map<String, dynamic>))
+          .toList();
+    }
+
     return Judgment(
       id: json['id'] as String,
       marketId: json['market_id'] as String,
@@ -83,6 +118,8 @@ class Judgment {
       reasoning: json['reasoning'] as String?,
       modelVotes: votes,
       qualityScore: (json['quality_score'] as num?)?.toDouble(),
+      biasFlags: biasFlags,
+      isLowConfidence: json['is_low_confidence'] as bool? ?? false,
       horizonHours: json['horizon_hours'] as int? ?? 4,
       expiresAt: json['expires_at'] != null
           ? DateTime.parse(json['expires_at'] as String)

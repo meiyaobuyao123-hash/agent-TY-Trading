@@ -102,6 +102,8 @@ class Judgment(Base):
     reasoning = Column(Text, nullable=True)
     model_votes = Column(JSON, nullable=True)
     quality_score = Column(Float, nullable=True)
+    bias_flags = Column(JSON, nullable=True)  # e.g. [{"type":"momentum","label":"...","detail":"..."}]
+    is_low_confidence = Column(Boolean, default=False)  # L4: 低信心预测标记
     horizon_hours = Column(Integer, default=4)
     expires_at = Column(DateTime, nullable=True)
     created_at = Column(DateTime, default=datetime.utcnow)

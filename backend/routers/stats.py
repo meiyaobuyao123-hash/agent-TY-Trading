@@ -17,6 +17,15 @@ from backend.models import Market, MarketSnapshot, Judgment, Settlement, Accurac
 router = APIRouter(prefix="/stats", tags=["stats"])
 
 
+class MarketBreadth(BaseModel):
+    up_count: int = 0
+    down_count: int = 0
+    flat_count: int = 0
+    total: int = 0
+    up_pct: float = 50.0
+    mood: str = "中性"
+
+
 class OverviewResponse(BaseModel):
     days_running: int
     total_judgments: int
@@ -26,6 +35,7 @@ class OverviewResponse(BaseModel):
     markets_with_data: int
     active_models: list[str]
     active_data_sources: int
+    market_breadth: Optional[MarketBreadth] = None
 
 
 @router.get("/overview", response_model=OverviewResponse)
@@ -91,7 +101,49 @@ async def get_overview(
     active_models = ["deepseek"]
 
     # Active data sources count
-    active_data_sources = 5
+    active_data_sources = 6  # +1 for fear & greed
+
+    # Market breadth: compute from latest snapshots
+    breadth = None
+    try:
+        # Get the latest snapshot per market with change_pct
+        latest_snap_sub = (
+            select(
+                MarketSnapshot.market_id,
+                func.max(MarketSnapshot.captured_at).label("max_at"),
+            )
+            .group_by(MarketSnapshot.market_id)
+            .subquery()
+        )
+        snap_stmt = (
+            select(MarketSnapshot.change_pct)
+            .join(
+                latest_snap_sub,
+                and_(
+                    MarketSnapshot.market_id == latest_snap_sub.c.market_id,
+                    MarketSnapshot.captured_at == latest_snap_sub.c.max_at,
+                ),
+            )
+            .where(MarketSnapshot.change_pct.isnot(None))
+        )
+        snap_result = await session.execute(snap_stmt)
+        changes = [r[0] for r in snap_result.all()]
+        if changes:
+            up_c = sum(1 for c in changes if c > 0.5)
+            down_c = sum(1 for c in changes if c < -0.5)
+            flat_c = len(changes) - up_c - down_c
+            up_pct = up_c / len(changes) * 100
+            mood = "贪婪" if up_pct > 70 else ("恐慌" if up_pct < 30 else "中性")
+            breadth = MarketBreadth(
+                up_count=up_c,
+                down_count=down_c,
+                flat_count=flat_c,
+                total=len(changes),
+                up_pct=round(up_pct, 1),
+                mood=mood,
+            )
+    except Exception:
+        pass
 
     return OverviewResponse(
         days_running=days_running,
@@ -102,6 +154,7 @@ async def get_overview(
         markets_with_data=markets_with_data,
         active_models=active_models,
         active_data_sources=active_data_sources,
+        market_breadth=breadth,
     )
 
 
@@ -398,3 +451,249 @@ async def get_alerts(
 
     # Limit to 20 alerts
     return AlertsResponse(alerts=alerts[:20])
+
+
+# ── Bias Report ─────────────────────────────────────────────────────────
+
+
+class BiasTypeStats(BaseModel):
+    type: str
+    label: str
+    count: int
+    pct_of_judgments: float
+    accuracy_when_biased: Optional[float] = None
+    accuracy_when_unbiased: Optional[float] = None
+
+
+class BiasReportResponse(BaseModel):
+    total_judgments_with_bias: int
+    total_judgments: int
+    bias_rate: float
+    bias_types: list[BiasTypeStats]
+    insight: str
+
+
+@router.get("/bias-report", response_model=BiasReportResponse)
+async def get_bias_report(
+    session: AsyncSession = Depends(get_session),
+) -> BiasReportResponse:
+    """Return aggregate bias detection statistics and correlation with accuracy."""
+
+    # Get all judgments with bias_flags
+    all_stmt = (
+        select(Judgment)
+        .outerjoin(Settlement, Settlement.judgment_id == Judgment.id)
+        .options(joinedload(Judgment.settlement))
+        .order_by(desc(Judgment.created_at))
+        .limit(500)
+    )
+    result = await session.execute(all_stmt)
+    judgments = result.unique().scalars().all()
+
+    total = len(judgments)
+    if total == 0:
+        return BiasReportResponse(
+            total_judgments_with_bias=0,
+            total_judgments=0,
+            bias_rate=0.0,
+            bias_types=[],
+            insight="暂无判断数据，无法生成偏差报告。",
+        )
+
+    # Count bias types
+    bias_counts: dict[str, int] = {}
+    bias_labels: dict[str, str] = {}
+    biased_correct: dict[str, int] = {}
+    biased_settled: dict[str, int] = {}
+    unbiased_correct = 0
+    unbiased_settled = 0
+    judgments_with_bias = 0
+
+    for j in judgments:
+        flags = j.bias_flags or []
+        has_bias = len(flags) > 0
+        if has_bias:
+            judgments_with_bias += 1
+
+        is_settled = j.settlement is not None
+        is_correct = j.settlement.is_correct if is_settled and j.settlement else None
+
+        if has_bias:
+            for flag in flags:
+                bt = flag.get("type", "unknown")
+                bias_counts[bt] = bias_counts.get(bt, 0) + 1
+                bias_labels[bt] = flag.get("label", bt)
+                if is_settled and is_correct is not None:
+                    biased_settled[bt] = biased_settled.get(bt, 0) + 1
+                    if is_correct:
+                        biased_correct[bt] = biased_correct.get(bt, 0) + 1
+        else:
+            if is_settled and is_correct is not None:
+                unbiased_settled += 1
+                if is_correct:
+                    unbiased_correct += 1
+
+    unbiased_accuracy = None
+    if unbiased_settled > 0:
+        unbiased_accuracy = round(unbiased_correct / unbiased_settled * 100, 1)
+
+    bias_type_stats = []
+    for bt, count in sorted(bias_counts.items(), key=lambda x: -x[1]):
+        biased_acc = None
+        if biased_settled.get(bt, 0) > 0:
+            biased_acc = round(biased_correct.get(bt, 0) / biased_settled[bt] * 100, 1)
+        bias_type_stats.append(BiasTypeStats(
+            type=bt,
+            label=bias_labels.get(bt, bt),
+            count=count,
+            pct_of_judgments=round(count / total * 100, 1),
+            accuracy_when_biased=biased_acc,
+            accuracy_when_unbiased=unbiased_accuracy,
+        ))
+
+    bias_rate = round(judgments_with_bias / total * 100, 1) if total > 0 else 0.0
+
+    # Generate insight
+    if not bias_type_stats:
+        insight = "近期判断中未检测到明显的认知偏差。"
+    else:
+        most_common = bias_type_stats[0]
+        insight = f"最常见的偏差是「{most_common.label}」，出现{most_common.count}次 ({most_common.pct_of_judgments}%)。"
+        if most_common.accuracy_when_biased is not None and unbiased_accuracy is not None:
+            diff = most_common.accuracy_when_biased - unbiased_accuracy
+            if diff < -5:
+                insight += f" 存在该偏差时准确率降低 {abs(diff):.1f}%，建议关注。"
+            elif diff > 5:
+                insight += f" 但该偏差标记时准确率反而提高 {diff:.1f}%。"
+
+    return BiasReportResponse(
+        total_judgments_with_bias=judgments_with_bias,
+        total_judgments=total,
+        bias_rate=bias_rate,
+        bias_types=bias_type_stats,
+        insight=insight,
+    )
+
+
+# ── Accuracy by Hour ──────────────────────────────────────────────
+
+
+class AccuracyByHourItem(BaseModel):
+    hour: int
+    total: int
+    correct: int
+    accuracy_pct: float
+
+
+class AccuracyByHourResponse(BaseModel):
+    items: list[AccuracyByHourItem]
+    insight: str
+
+
+@router.get("/accuracy-by-hour", response_model=AccuracyByHourResponse)
+async def get_accuracy_by_hour(
+    session: AsyncSession = Depends(get_session),
+) -> AccuracyByHourResponse:
+    """Return accuracy broken down by hour of day (0-23 UTC).
+
+    Reveals time-of-day patterns: e.g. AI predicts better during Asian trading hours.
+    """
+    # Get all settled judgments with their creation hour
+    stmt = (
+        select(Judgment, Settlement)
+        .join(Settlement, Settlement.judgment_id == Judgment.id)
+        .where(Settlement.is_correct.isnot(None))
+    )
+    result = await session.execute(stmt)
+    rows = result.all()
+
+    # Aggregate by hour
+    hour_stats: dict[int, dict] = {h: {"total": 0, "correct": 0} for h in range(24)}
+    for j, s in rows:
+        hour = j.created_at.hour
+        hour_stats[hour]["total"] += 1
+        if s.is_correct:
+            hour_stats[hour]["correct"] += 1
+
+    items = []
+    for h in range(24):
+        total = hour_stats[h]["total"]
+        correct = hour_stats[h]["correct"]
+        pct = round((correct / total * 100), 1) if total > 0 else 0.0
+        items.append(AccuracyByHourItem(
+            hour=h, total=total, correct=correct, accuracy_pct=pct,
+        ))
+
+    # Generate insight
+    active_hours = [i for i in items if i.total >= 3]
+    if not active_hours:
+        insight = "数据不足，暂无时段分析。需要更多已结算的判断才能发现时间规律。"
+    else:
+        best = max(active_hours, key=lambda x: x.accuracy_pct)
+        worst = min(active_hours, key=lambda x: x.accuracy_pct)
+        # Map hour to trading session
+        def _session_label(h: int) -> str:
+            if 0 <= h < 7:
+                return "亚洲盘前"
+            elif 7 <= h < 10:
+                return "亚洲盘"
+            elif 10 <= h < 14:
+                return "欧洲盘"
+            elif 14 <= h < 21:
+                return "美洲盘"
+            else:
+                return "亚洲盘前"
+
+        insight = (
+            f"最佳预测时段: {best.hour}:00 UTC ({_session_label(best.hour)}) "
+            f"准确率 {best.accuracy_pct:.1f}% ({best.correct}/{best.total})。"
+            f"最差时段: {worst.hour}:00 UTC ({_session_label(worst.hour)}) "
+            f"准确率 {worst.accuracy_pct:.1f}%。"
+        )
+
+    return AccuracyByHourResponse(items=items, insight=insight)
+
+
+# ── Strategy Genome Status ─────────────────────────────────────────
+
+
+class GenomeStatusItem(BaseModel):
+    id: str
+    name: str
+    generation: int
+    fitness: float
+    total_judgments: int
+    weights: dict
+
+
+class GenomeStatusResponse(BaseModel):
+    genomes: list[GenomeStatusItem]
+    active_genome: Optional[str] = None
+
+
+@router.get("/genome-status", response_model=GenomeStatusResponse)
+async def get_genome_status(
+    session: AsyncSession = Depends(get_session),
+) -> GenomeStatusResponse:
+    """Return the current status of all strategy genomes (L4 Self-Evolution)."""
+    from backend.core.strategy_genome import load_genomes, get_best_genome
+
+    genomes = await load_genomes(session)
+    best_config = await get_best_genome(session)
+
+    items = []
+    active_name = None
+    for g in genomes:
+        items.append(GenomeStatusItem(
+            id=g.id,
+            name=g.name,
+            generation=g.generation,
+            fitness=round(g.fitness, 4),
+            total_judgments=g.total_judgments,
+            weights=g.config.to_dict(),
+        ))
+        # Determine which is the active genome
+        if best_config and g.config.to_dict() == best_config.to_dict():
+            active_name = g.name
+
+    return GenomeStatusResponse(genomes=items, active_genome=active_name)

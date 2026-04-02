@@ -27,3 +27,24 @@ final calibrationProvider =
   final repo = ref.watch(accuracyRepositoryProvider);
   return repo.fetchCalibration();
 });
+
+/// Provides bias report data.
+final biasReportProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchBiasReport();
+});
+
+/// Provides accuracy by hour data.
+final accuracyByHourProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchAccuracyByHour();
+});
+
+/// Provides strategy genome status.
+final genomeStatusProvider =
+    FutureProvider<Map<String, dynamic>>((ref) async {
+  final repo = ref.watch(accuracyRepositoryProvider);
+  return repo.fetchGenomeStatus();
+});

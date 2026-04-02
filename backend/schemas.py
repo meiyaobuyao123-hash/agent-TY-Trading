@@ -72,6 +72,8 @@ class JudgmentOut(BaseModel):
     reasoning: Optional[str] = None
     model_votes: Optional[list[dict]] = None
     quality_score: Optional[float] = None
+    bias_flags: Optional[list[dict]] = None
+    is_low_confidence: bool = False
     horizon_hours: int = 4
     expires_at: Optional[datetime] = None
     created_at: datetime

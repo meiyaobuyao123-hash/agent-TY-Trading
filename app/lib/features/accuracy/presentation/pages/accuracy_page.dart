@@ -204,6 +204,21 @@ class AccuracyPage extends ConsumerWidget {
 
           const SizedBox(height: 24),
 
+          // ── Accuracy by Hour heatmap (L4) ──
+          _AccuracyByHourSection(),
+
+          const SizedBox(height: 24),
+
+          // ── Strategy Genome Status (L4) ──
+          _GenomeStatusSection(),
+
+          const SizedBox(height: 24),
+
+          // ── Bias Report section (L3 Cognitive Bias Hunter) ──
+          _BiasReportSection(),
+
+          const SizedBox(height: 24),
+
           // Section header
           const Padding(
             padding: EdgeInsets.only(bottom: 12),
@@ -751,6 +766,262 @@ class _AccuracyTrendSection extends ConsumerWidget {
   }
 }
 
+/// Bias Report section — shows cognitive bias statistics (L3).
+class _BiasReportSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final biasAsync = ref.watch(biasReportProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFF9800).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: const Icon(Icons.psychology_alt_rounded,
+                    size: 16, color: Color(0xFFFF9800)),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                '认知偏差报告',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'AI判断中检测到的认知偏差统计，帮助理解AI的局限性。',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          biasAsync.when(
+            loading: () => const SizedBox(
+              height: 80,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (_, _) => const SizedBox(
+              height: 60,
+              child: Center(
+                child: Text(
+                  '加载偏差报告失败',
+                  style: TextStyle(
+                    color: AppTheme.textSecondary,
+                    fontSize: 13,
+                  ),
+                ),
+              ),
+            ),
+            data: (report) => _buildBiasContent(report),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildBiasContent(Map<String, dynamic> report) {
+    final totalWithBias = report['total_judgments_with_bias'] as int? ?? 0;
+    final total = report['total_judgments'] as int? ?? 0;
+    final biasRate = report['bias_rate'] as num? ?? 0.0;
+    final insight = report['insight'] as String? ?? '';
+    final biasTypes = (report['bias_types'] as List<dynamic>?) ?? [];
+
+    if (total == 0) {
+      return const Text(
+        '暂无数据',
+        style: TextStyle(fontSize: 13, color: AppTheme.textSecondary),
+      );
+    }
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Summary row
+        Row(
+          children: [
+            _biasMetric('偏差检出率', '${biasRate.toStringAsFixed(1)}%'),
+            const SizedBox(width: 20),
+            _biasMetric('有偏差判断', '$totalWithBias/$total'),
+          ],
+        ),
+        const SizedBox(height: 14),
+        // Bias type bars
+        ...biasTypes.map((bt) {
+          final label = bt['label'] as String? ?? '';
+          final count = bt['count'] as int? ?? 0;
+          final pct = bt['pct_of_judgments'] as num? ?? 0;
+          final accBiased = bt['accuracy_when_biased'] as num?;
+          final accUnbiased = bt['accuracy_when_unbiased'] as num?;
+
+          final biasIcon = _biasIcon(bt['type'] as String? ?? '');
+
+          return Padding(
+            padding: const EdgeInsets.only(bottom: 10),
+            child: Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.background,
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Text(biasIcon, style: const TextStyle(fontSize: 14)),
+                      const SizedBox(width: 6),
+                      Text(
+                        label,
+                        style: const TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                        ),
+                      ),
+                      const Spacer(),
+                      Text(
+                        '$count次 (${pct.toStringAsFixed(1)}%)',
+                        style: const TextStyle(
+                          fontSize: 13,
+                          color: AppTheme.textSecondary,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                    ],
+                  ),
+                  if (accBiased != null || accUnbiased != null) ...[
+                    const SizedBox(height: 8),
+                    Row(
+                      children: [
+                        if (accBiased != null) ...[
+                          Text(
+                            '有偏差: ${accBiased.toStringAsFixed(1)}%',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: accBiased < 40
+                                  ? AppTheme.downRed
+                                  : AppTheme.textSecondary,
+                              fontFeatures: const [
+                                FontFeature.tabularFigures()
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                        ],
+                        if (accUnbiased != null)
+                          Text(
+                            '无偏差: ${accUnbiased.toStringAsFixed(1)}%',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              color: AppTheme.textSecondary,
+                              fontFeatures: [FontFeature.tabularFigures()],
+                            ),
+                          ),
+                      ],
+                    ),
+                  ],
+                ],
+              ),
+            ),
+          );
+        }),
+        // Insight
+        if (insight.isNotEmpty) ...[
+          const SizedBox(height: 6),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFFFF9800).withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.lightbulb_outline_rounded,
+                    size: 14, color: Color(0xFFFF9800)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    insight,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+
+  Widget _biasMetric(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 12,
+            color: AppTheme.textSecondary,
+          ),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 18,
+            fontWeight: FontWeight.w700,
+            color: AppTheme.textPrimary,
+            fontFeatures: [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
+    );
+  }
+
+  String _biasIcon(String type) {
+    switch (type) {
+      case 'momentum':
+        return '\u26A0\uFE0F';
+      case 'consensus':
+        return '\uD83D\uDC65';
+      case 'anchoring':
+        return '\u2693';
+      default:
+        return '\u26A0\uFE0F';
+    }
+  }
+}
+
 class _MarketAccuracyCard extends StatelessWidget {
   final AccuracyStat stat;
   final String localizedType;
@@ -829,6 +1100,428 @@ class _MarketAccuracyCard extends StatelessWidget {
             style: const TextStyle(
               color: AppTheme.textSecondary,
               fontSize: 12,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// Accuracy by Hour heatmap section (L4).
+class _AccuracyByHourSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final dataAsync = ref.watch(accuracyByHourProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF2196F3).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: const Icon(Icons.schedule_rounded,
+                    size: 16, color: Color(0xFF2196F3)),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                '时段准确率',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            'AI在不同时段(UTC)的预测准确率，揭示最佳预测窗口。',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          dataAsync.when(
+            loading: () => const SizedBox(
+              height: 80,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (_, _) => const SizedBox(
+              height: 60,
+              child: Center(
+                child: Text('加载时段数据失败',
+                    style: TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 13)),
+              ),
+            ),
+            data: (data) => _buildHeatmap(data),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildHeatmap(Map<String, dynamic> data) {
+    final items = (data['items'] as List<dynamic>?) ?? [];
+    final insight = data['insight'] as String? ?? '';
+
+    if (items.isEmpty) {
+      return const Text('暂无时段数据',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13));
+    }
+
+    // Build a 4x6 grid (4 rows of 6 hours each)
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Heatmap grid
+        Wrap(
+          spacing: 3,
+          runSpacing: 3,
+          children: List.generate(24, (h) {
+            final item = items.firstWhere(
+              (i) => (i['hour'] as int) == h,
+              orElse: () => {'hour': h, 'total': 0, 'accuracy_pct': 0.0},
+            );
+            final total = item['total'] as int? ?? 0;
+            final pct = (item['accuracy_pct'] as num?)?.toDouble() ?? 0.0;
+
+            Color cellColor;
+            if (total == 0) {
+              cellColor = const Color(0xFFF2F2F7);
+            } else if (pct >= 60) {
+              cellColor = AppTheme.upGreen.withValues(
+                  alpha: 0.2 + (pct - 60) / 40 * 0.6);
+            } else if (pct >= 40) {
+              cellColor = const Color(0xFFFFCC00).withValues(
+                  alpha: 0.3);
+            } else {
+              cellColor = AppTheme.downRed.withValues(
+                  alpha: 0.2 + (40 - pct) / 40 * 0.4);
+            }
+
+            return Tooltip(
+              message: total > 0
+                  ? '$h:00 UTC  准确率${pct.toStringAsFixed(0)}% ($total次)'
+                  : '$h:00 UTC  无数据',
+              child: Container(
+                width: 42,
+                height: 32,
+                decoration: BoxDecoration(
+                  color: cellColor,
+                  borderRadius: BorderRadius.circular(4),
+                ),
+                alignment: Alignment.center,
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Text(
+                      '${h}h',
+                      style: const TextStyle(
+                        fontSize: 9,
+                        color: AppTheme.textSecondary,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (total > 0)
+                      Text(
+                        '${pct.toStringAsFixed(0)}%',
+                        style: const TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w600,
+                          color: AppTheme.textPrimary,
+                          fontFeatures: [FontFeature.tabularFigures()],
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+            );
+          }),
+        ),
+        if (insight.isNotEmpty) ...[
+          const SizedBox(height: 12),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
+            decoration: BoxDecoration(
+              color: const Color(0xFF2196F3).withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Icon(Icons.lightbulb_outline_rounded,
+                    size: 14, color: Color(0xFF2196F3)),
+                const SizedBox(width: 6),
+                Expanded(
+                  child: Text(
+                    insight,
+                    style: const TextStyle(
+                      fontSize: 12,
+                      color: AppTheme.textSecondary,
+                      height: 1.4,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ],
+    );
+  }
+}
+
+/// Strategy Genome Status section (L4 Self-Evolution).
+class _GenomeStatusSection extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final genomeAsync = ref.watch(genomeStatusProvider);
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: AppTheme.surface,
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 28,
+                height: 28,
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4CAF50).withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(7),
+                ),
+                child: const Icon(Icons.biotech_rounded,
+                    size: 16, color: Color(0xFF4CAF50)),
+              ),
+              const SizedBox(width: 10),
+              const Text(
+                '策略基因组',
+                style: TextStyle(
+                  fontSize: 15,
+                  fontWeight: FontWeight.w600,
+                  color: AppTheme.textPrimary,
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Text(
+            '三个策略基因组通过自然选择进化。表现最差的定期变异，最优的指导AI判断。',
+            style: TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+              height: 1.4,
+            ),
+          ),
+          const SizedBox(height: 14),
+          genomeAsync.when(
+            loading: () => const SizedBox(
+              height: 80,
+              child: Center(
+                child: SizedBox(
+                  width: 20,
+                  height: 20,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                ),
+              ),
+            ),
+            error: (_, _) => const SizedBox(
+              height: 60,
+              child: Center(
+                child: Text('加载基因组数据失败',
+                    style: TextStyle(
+                        color: AppTheme.textSecondary, fontSize: 13)),
+              ),
+            ),
+            data: (data) => _buildGenomeCards(data),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildGenomeCards(Map<String, dynamic> data) {
+    final genomes = (data['genomes'] as List<dynamic>?) ?? [];
+    final activeGenome = data['active_genome'] as String?;
+
+    if (genomes.isEmpty) {
+      return const Text('暂无基因组数据',
+          style: TextStyle(color: AppTheme.textSecondary, fontSize: 13));
+    }
+
+    return Column(
+      children: genomes.map((g) {
+        final name = g['name'] as String? ?? '';
+        final gen = g['generation'] as int? ?? 1;
+        final fitness = (g['fitness'] as num?)?.toDouble() ?? 0.0;
+        final total = g['total_judgments'] as int? ?? 0;
+        final isActive = name == activeGenome;
+        final weights = g['weights'] as Map<String, dynamic>? ?? {};
+
+        return Container(
+          margin: const EdgeInsets.only(bottom: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: isActive
+                ? const Color(0xFF4CAF50).withValues(alpha: 0.06)
+                : AppTheme.background,
+            borderRadius: BorderRadius.circular(10),
+            border: isActive
+                ? Border.all(
+                    color: const Color(0xFF4CAF50).withValues(alpha: 0.3),
+                    width: 1)
+                : null,
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      name,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.textPrimary,
+                      ),
+                    ),
+                  ),
+                  if (isActive)
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color:
+                            const Color(0xFF4CAF50).withValues(alpha: 0.15),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Text(
+                        '当前使用',
+                        style: TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w600,
+                          color: Color(0xFF4CAF50),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  _genomeMetric('代数', '$gen'),
+                  const SizedBox(width: 16),
+                  _genomeMetric(
+                      '适应度', '${(fitness * 100).toStringAsFixed(1)}%'),
+                  const SizedBox(width: 16),
+                  _genomeMetric('判断数', '$total'),
+                ],
+              ),
+              const SizedBox(height: 8),
+              // Weight bar visualization
+              _weightBar('动量',
+                  (weights['momentum_weight'] as num?)?.toDouble() ?? 0.5),
+              _weightBar('逆势',
+                  (weights['contrarian_weight'] as num?)?.toDouble() ?? 0.3),
+              _weightBar('量能',
+                  (weights['volume_weight'] as num?)?.toDouble() ?? 0.4),
+              _weightBar('联动',
+                  (weights['cross_market_weight'] as num?)?.toDouble() ?? 0.3),
+              _weightBar('趋势',
+                  (weights['history_weight'] as num?)?.toDouble() ?? 0.4),
+            ],
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  Widget _genomeMetric(String label, String value) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(label,
+            style: const TextStyle(
+                fontSize: 10, color: AppTheme.textSecondary)),
+        Text(value,
+            style: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              color: AppTheme.textPrimary,
+              fontFeatures: [FontFeature.tabularFigures()],
+            )),
+      ],
+    );
+  }
+
+  Widget _weightBar(String label, double weight) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 3),
+      child: Row(
+        children: [
+          SizedBox(
+            width: 28,
+            child: Text(label,
+                style: const TextStyle(
+                    fontSize: 10, color: AppTheme.textSecondary)),
+          ),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(2),
+              child: SizedBox(
+                height: 4,
+                child: LinearProgressIndicator(
+                  value: weight.clamp(0.0, 1.0),
+                  backgroundColor: const Color(0xFFF2F2F7),
+                  valueColor: AlwaysStoppedAnimation<Color>(
+                    weight >= 0.7
+                        ? AppTheme.primary
+                        : weight >= 0.4
+                            ? const Color(0xFFFFCC00)
+                            : AppTheme.flatGray,
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 6),
+          SizedBox(
+            width: 28,
+            child: Text(
+              weight.toStringAsFixed(2),
+              style: const TextStyle(
+                fontSize: 9,
+                color: AppTheme.textSecondary,
+                fontFeatures: [FontFeature.tabularFigures()],
+              ),
             ),
           ),
         ],

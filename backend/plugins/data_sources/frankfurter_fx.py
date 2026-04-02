@@ -33,6 +33,15 @@ FX_PAIRS = {
     "USD/HKD": ("USD", "HKD"),
     "USD/SGD": ("USD", "SGD"),
     "EUR/JPY": ("EUR", "JPY"),
+    # R12 expansion
+    "USD/MXN": ("USD", "MXN"),
+    "USD/BRL": ("USD", "BRL"),
+    "USD/ZAR": ("USD", "ZAR"),
+    "USD/TRY": ("USD", "TRY"),
+    "EUR/CHF": ("EUR", "CHF"),
+    "GBP/JPY": ("GBP", "JPY"),
+    "AUD/JPY": ("AUD", "JPY"),
+    "NZD/JPY": ("NZD", "JPY"),
 }
 
 

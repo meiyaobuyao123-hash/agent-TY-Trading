@@ -18,7 +18,10 @@ from backend.core.correlations import MARKET_BENCHMARKS, compute_quality_score
 from backend.core.plugin_manager import PluginManager
 from backend.core.types import DataQuery, MarketType, Timeframe
 from backend.models import Judgment, Market, MarketSnapshot, Settlement, AccuracyStat
+from backend.core.strategy_genome import get_best_genome, build_genome_prompt_hint
 from backend.plugins.bias_detectors.deviation_calc import calculate_deviation_pct
+from backend.plugins.bias_detectors.cognitive_bias import detect_all_biases
+from backend.plugins.data_sources.fear_greed import get_fear_greed_index
 
 logger = logging.getLogger(__name__)
 
@@ -128,7 +131,7 @@ async def _build_market_context(
                 "change_pct": tick.get("change_pct"),
             }
 
-    # Compute overall market sentiment summary
+    # Compute overall market sentiment summary (market breadth)
     up_count = 0
     down_count = 0
     flat_count = 0
@@ -143,7 +146,21 @@ async def _build_market_context(
                 flat_count += 1
     total = up_count + down_count + flat_count
     if total > 0:
+        up_pct = up_count / total * 100
+        if up_pct > 70:
+            mood = "贪婪"
+        elif up_pct < 30:
+            mood = "恐慌"
+        else:
+            mood = "中性"
         context["_sentiment"] = f"{up_count}/{total}个市场上涨, {down_count}/{total}个下跌"
+        context["_market_breadth"] = {
+            "up_pct": round(up_pct, 1),
+            "mood": mood,
+            "up_count": up_count,
+            "down_count": down_count,
+            "total": total,
+        }
 
     return context
 
@@ -237,7 +254,31 @@ async def _process_single_market(
             market.market_type, market.symbol, tick_cache
         )
 
-        # 4b. AI consensus
+        # 4b. Fetch fear & greed index for crypto markets
+        fear_greed_ctx = None
+        if market.market_type == "crypto":
+            try:
+                fg = await get_fear_greed_index()
+                if fg:
+                    fear_greed_ctx = fg
+            except Exception:
+                logger.debug("Failed to fetch fear & greed index")
+
+        # 4c. Market breadth sentiment
+        market_breadth_ctx = None
+        if market_context and "_market_breadth" in market_context:
+            market_breadth_ctx = market_context["_market_breadth"]
+
+        # 4d. Load best strategy genome for prompt guidance (L4)
+        genome_hint = ""
+        try:
+            best_genome = await get_best_genome(session)
+            if best_genome:
+                genome_hint = build_genome_prompt_hint(best_genome)
+        except Exception:
+            logger.debug("Failed to load strategy genome for %s", market.symbol)
+
+        # 4e. AI consensus
         context = {
             "symbol": market.symbol,
             "market_data": tick_data,
@@ -245,6 +286,9 @@ async def _process_single_market(
             "history_text": history_text,
             "last_judgment": last_judgment_ctx,
             "market_context": market_context if market_context else None,
+            "fear_greed": fear_greed_ctx,
+            "market_breadth": market_breadth_ctx,
+            "genome_hint": genome_hint,
         }
         ai_result = await reasoning.analyze(context)
 
@@ -264,7 +308,38 @@ async def _process_single_market(
             market_context=market_context if market_context else None,
         )
 
-        # 5b. Confidence calibration based on historical accuracy
+        # 5b. Cognitive bias detection (L3)
+        bias_flags = []
+        try:
+            # Fetch recent directions for consensus bias detection
+            recent_dirs_stmt = (
+                select(Judgment.direction)
+                .where(Judgment.market_id == market.id)
+                .order_by(desc(Judgment.created_at))
+                .limit(10)
+            )
+            recent_dirs_result = await session.execute(recent_dirs_stmt)
+            recent_directions = [r[0] for r in recent_dirs_result.all()]
+
+            bias_flags = detect_all_biases(
+                direction=ai_result.get("direction", "flat"),
+                confidence_score=ai_result.get("confidence_score", 0.3),
+                market_price=market_price or 0,
+                rational_price=rational_price,
+                change_pct=tick_data.get("change_pct"),
+                market_type=market.market_type,
+                recent_directions=recent_directions,
+            )
+            if bias_flags:
+                logger.info(
+                    "Bias flags for %s: %s",
+                    market.symbol,
+                    [f["type"] for f in bias_flags],
+                )
+        except Exception:
+            logger.debug("Failed bias detection for %s", market.symbol)
+
+        # 5c. Confidence calibration based on historical accuracy
         raw_confidence = ai_result.get("confidence_score", 0.3)
         calibrated_confidence = raw_confidence
         try:
@@ -293,6 +368,9 @@ async def _process_single_market(
         except Exception:
             logger.debug("Failed confidence calibration for %s", market.symbol)
 
+        # 5d. Low-confidence gate (L4 meta-cognition)
+        is_low_confidence = calibrated_confidence < 0.2
+
         # 6. Record judgment
         now = datetime.utcnow()
         judgment = Judgment(
@@ -307,6 +385,8 @@ async def _process_single_market(
             quality_score=quality_score,
             reasoning=ai_result.get("reasoning"),
             model_votes=ai_result.get("model_votes"),
+            bias_flags=bias_flags if bias_flags else None,
+            is_low_confidence=is_low_confidence,
             horizon_hours=market_horizon,
             expires_at=now + timedelta(hours=market_horizon),
             created_at=now,

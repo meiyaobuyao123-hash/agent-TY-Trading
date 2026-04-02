@@ -1078,6 +1078,56 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
             ),
           ),
           const SizedBox(height: 8),
+          // Market breadth mood indicator
+          Builder(
+            builder: (context) {
+              final total = upCount + downCount + flatCount;
+              final upPct = total > 0 ? (upCount / total * 100) : 50.0;
+              String mood;
+              Color moodColor;
+              if (upPct > 70) {
+                mood = '贪婪';
+                moodColor = AppTheme.upGreen;
+              } else if (upPct < 30) {
+                mood = '恐慌';
+                moodColor = AppTheme.downRed;
+              } else {
+                mood = '中性';
+                moodColor = AppTheme.flatGray;
+              }
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                decoration: BoxDecoration(
+                  color: moodColor.withValues(alpha: 0.1),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(
+                      upPct > 70
+                          ? Icons.trending_up_rounded
+                          : upPct < 30
+                              ? Icons.trending_down_rounded
+                              : Icons.trending_flat_rounded,
+                      size: 14,
+                      color: moodColor,
+                    ),
+                    const SizedBox(width: 4),
+                    Text(
+                      '\u5E02\u573A\u60C5\u7EEA: $mood (${upPct.toStringAsFixed(0)}%\u4E0A\u6DA8)',
+                      style: TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: moodColor,
+                      ),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
+          const SizedBox(height: 8),
           Text(
             upCount > downCount
                 ? '整体偏多头，市场情绪积极'

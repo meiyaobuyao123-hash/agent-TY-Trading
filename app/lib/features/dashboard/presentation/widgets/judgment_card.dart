@@ -47,111 +47,135 @@ class JudgmentCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final timeFormat = DateFormat('MM/dd HH:mm');
+    final isLow = judgment.isLowConfidence;
 
-    return InkWell(
-      onTap: () {
-        if (judgment.symbol != null) {
-          context.push('/market/${judgment.symbol}');
-        }
-      },
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-        child: Row(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // Left: emoji icon
-            Container(
-              width: 44,
-              height: 44,
-              decoration: BoxDecoration(
-                color: AppTheme.surface,
-                borderRadius: BorderRadius.circular(10),
+    return Opacity(
+      opacity: isLow ? 0.5 : 1.0,
+      child: InkWell(
+        onTap: () {
+          if (judgment.symbol != null) {
+            context.push('/market/${judgment.symbol}');
+          }
+        },
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // Left: emoji icon
+              Container(
+                width: 44,
+                height: 44,
+                decoration: BoxDecoration(
+                  color: AppTheme.surface,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                alignment: Alignment.center,
+                child: Text(
+                  _directionEmoji(),
+                  style: const TextStyle(fontSize: 22),
+                ),
               ),
-              alignment: Alignment.center,
-              child: Text(
-                _directionEmoji(),
-                style: const TextStyle(fontSize: 22),
-              ),
-            ),
-            const SizedBox(width: 12),
+              const SizedBox(width: 12),
 
-            // Middle: market name + one-line reasoning
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
+              // Middle: market name + one-line reasoning
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Text(
+                          judgment.symbol ?? '未知',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(width: 6),
+                        Container(
+                          width: 5,
+                          height: 5,
+                          decoration: BoxDecoration(
+                            color: _directionDotColor(),
+                            shape: BoxShape.circle,
+                          ),
+                        ),
+                        const SizedBox(width: 3),
+                        Text(
+                          _directionLabel(),
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: _directionDotColor(),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        if (isLow) ...[
+                          const SizedBox(width: 6),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 5, vertical: 1),
+                            decoration: BoxDecoration(
+                              color: AppTheme.flatGray
+                                  .withValues(alpha: 0.15),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              '信心不足，仅供参考',
+                              style: TextStyle(
+                                fontSize: 9,
+                                color: AppTheme.flatGray,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                    const SizedBox(height: 4),
+                    if (judgment.reasoning != null)
                       Text(
-                        judgment.symbol ?? '未知',
+                        judgment.reasoning!,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
+                          color: AppTheme.textSecondary,
+                          fontSize: 13,
+                          height: 1.3,
                         ),
                       ),
-                      const SizedBox(width: 6),
-                      Container(
-                        width: 5,
-                        height: 5,
-                        decoration: BoxDecoration(
-                          color: _directionDotColor(),
-                          shape: BoxShape.circle,
-                        ),
-                      ),
-                      const SizedBox(width: 3),
-                      Text(
-                        _directionLabel(),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: _directionDotColor(),
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 4),
-                  if (judgment.reasoning != null)
+                    const SizedBox(height: 4),
                     Text(
-                      judgment.reasoning!,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
+                      timeFormat.format(judgment.createdAt.toLocal()),
                       style: const TextStyle(
-                        color: AppTheme.textSecondary,
-                        fontSize: 13,
-                        height: 1.3,
+                        color: AppTheme.flatGray,
+                        fontSize: 11,
                       ),
                     ),
-                  const SizedBox(height: 4),
+                  ],
+                ),
+              ),
+
+              // Right: confidence %
+              const SizedBox(width: 8),
+              Column(
+                crossAxisAlignment: CrossAxisAlignment.end,
+                children: [
                   Text(
-                    timeFormat.format(judgment.createdAt.toLocal()),
+                    '${(judgment.confidenceScore * 100).toStringAsFixed(0)}%',
                     style: const TextStyle(
-                      color: AppTheme.flatGray,
-                      fontSize: 11,
+                      fontSize: 15,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimary,
                     ),
                   ),
+                  const SizedBox(height: 2),
+                  _buildSettlementDot(),
                 ],
               ),
-            ),
-
-            // Right: confidence %
-            const SizedBox(width: 8),
-            Column(
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: [
-                Text(
-                  '${(judgment.confidenceScore * 100).toStringAsFixed(0)}%',
-                  style: const TextStyle(
-                    fontSize: 15,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
-                  ),
-                ),
-                const SizedBox(height: 2),
-                _buildSettlementDot(),
-              ],
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );

@@ -20,6 +20,7 @@ def register_jobs(
     judgment_trigger_fn,
     settlement_fn,
     accuracy_fn,
+    genome_evolution_fn=None,
 ) -> None:
     """Register all recurring jobs.
 
@@ -28,6 +29,7 @@ def register_jobs(
     judgment_trigger_fn : async callable — runs full AI judgment cycle
     settlement_fn       : async callable — settles expired judgments
     accuracy_fn         : async callable — recalculates accuracy stats
+    genome_evolution_fn : async callable — evolves strategy genomes (L4)
     """
 
     # AI judgment every 4 hours
@@ -59,6 +61,17 @@ def register_jobs(
         name="Accuracy Calculation",
         replace_existing=True,
     )
+
+    # L4: Strategy genome evolution every 24 hours
+    if genome_evolution_fn:
+        scheduler.add_job(
+            genome_evolution_fn,
+            "interval",
+            hours=24,
+            id="genome_evolution",
+            name="Strategy Genome Evolution (L4)",
+            replace_existing=True,
+        )
 
     logger.info(
         "Registered %d scheduled jobs", len(scheduler.get_jobs())
