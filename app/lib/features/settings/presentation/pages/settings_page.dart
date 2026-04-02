@@ -115,20 +115,20 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: AppTheme.surface,
+      backgroundColor: AppTheme.surfaceOf(context),
       body: SafeArea(
         child: ListView(
           padding: const EdgeInsets.only(bottom: 48),
           children: [
             // ── Large title header ──
-            const Padding(
-              padding: EdgeInsets.fromLTRB(24, 24, 20, 4),
+            Padding(
+              padding: const EdgeInsets.fromLTRB(24, 24, 20, 4),
               child: Text(
                 '设置',
                 style: TextStyle(
                   fontSize: 34,
                   fontWeight: FontWeight.w700,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimaryOf(context),
                   letterSpacing: -0.5,
                   height: 1.2,
                 ),
@@ -249,7 +249,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppTheme.background,
+                  color: AppTheme.cardColorOf(context),
                   borderRadius: const BorderRadius.only(
                     bottomLeft: Radius.circular(12),
                     bottomRight: Radius.circular(12),
@@ -347,7 +347,7 @@ class _SettingsPageState extends ConsumerState<SettingsPage> {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 16),
       decoration: BoxDecoration(
-        color: AppTheme.background,
+        color: AppTheme.cardColorOf(context),
         borderRadius: BorderRadius.circular(12),
       ),
       clipBehavior: Clip.antiAlias,

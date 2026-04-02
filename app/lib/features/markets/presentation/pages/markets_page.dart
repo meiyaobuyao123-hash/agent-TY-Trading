@@ -23,6 +23,8 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     'cn-equities': 'A股',
     'us-equities': '美股',
     'hk-equities': '港股',
+    'jp-equities': '日股',
+    'eu-equities': '欧股',
     'global-indices': '全球指数',
     'forex': '外汇',
     'commodities': '大宗商品',
@@ -40,6 +42,8 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     _FilterChip(label: 'ETF', type: 'etf'),
     _FilterChip(label: '外汇', type: 'forex'),
     _FilterChip(label: '宏观', type: 'macro'),
+    _FilterChip(label: '日股', type: 'jp-equities'),
+    _FilterChip(label: '欧股', type: 'eu-equities'),
   ];
 
   String? _selectedFilter;
@@ -120,12 +124,12 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
           SliverToBoxAdapter(
             child: Padding(
               padding: const EdgeInsets.fromLTRB(24, 16, 20, 0),
-              child: const Text(
+              child: Text(
                 '市场',
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w600,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimaryOf(context),
                   letterSpacing: -0.5,
                 ),
               ),
@@ -152,7 +156,7 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
                     size: 20,
                   ),
                   filled: true,
-                  fillColor: AppTheme.surface,
+                  fillColor: AppTheme.surfaceOf(context),
                   contentPadding: const EdgeInsets.symmetric(
                     horizontal: 16,
                     vertical: 10,
@@ -162,9 +166,9 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
                     borderSide: BorderSide.none,
                   ),
                 ),
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  color: AppTheme.textPrimary,
+                  color: AppTheme.textPrimaryOf(context),
                 ),
               ),
             ),
@@ -194,8 +198,8 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
                           ),
                           decoration: BoxDecoration(
                             color: isSelected
-                                ? AppTheme.textPrimary
-                                : AppTheme.surface,
+                                ? AppTheme.textPrimaryOf(context)
+                                : AppTheme.surfaceOf(context),
                             borderRadius: BorderRadius.circular(20),
                           ),
                           child: Text(
@@ -204,8 +208,8 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
                               fontSize: 14,
                               fontWeight: FontWeight.w500,
                               color: isSelected
-                                  ? AppTheme.background
-                                  : AppTheme.textSecondary,
+                                  ? AppTheme.backgroundOf(context)
+                                  : AppTheme.textSecondaryOf(context),
                             ),
                           ),
                         ),
@@ -257,7 +261,7 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
                 child: Container(
                   margin: const EdgeInsets.symmetric(horizontal: 24),
                   decoration: BoxDecoration(
-                    color: AppTheme.background,
+                    color: AppTheme.cardColorOf(context),
                     borderRadius: BorderRadius.circular(12),
                     boxShadow: [
                       BoxShadow(
@@ -372,9 +376,9 @@ class _MarketRow extends StatelessWidget {
                     children: [
                       Text(
                         market.symbol,
-                        style: const TextStyle(
+                        style: TextStyle(
                           fontWeight: FontWeight.w600,
-                          color: AppTheme.textPrimary,
+                          color: AppTheme.textPrimaryOf(context),
                           fontSize: 17,
                           letterSpacing: -0.2,
                         ),
@@ -398,9 +402,9 @@ class _MarketRow extends StatelessWidget {
                   children: [
                     Text(
                       price != null ? _formatPrice(price) : '\u2014',
-                      style: const TextStyle(
+                      style: TextStyle(
                         fontWeight: FontWeight.w600,
-                        color: AppTheme.textPrimary,
+                        color: AppTheme.textPrimaryOf(context),
                         fontSize: 17,
                         fontFeatures: [FontFeature.tabularFigures()],
                         letterSpacing: -0.2,
@@ -439,7 +443,7 @@ class _MarketRow extends StatelessWidget {
             padding: const EdgeInsets.only(left: 16),
             child: Container(
               height: 0.5,
-              color: AppTheme.divider,
+              color: AppTheme.dividerOf(context),
             ),
           ),
       ],

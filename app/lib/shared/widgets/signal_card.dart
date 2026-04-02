@@ -20,6 +20,9 @@ class SignalCard extends StatelessWidget {
   final bool? isSettled;
   final bool? isCorrect;
   final double? qualityScore;
+  final double? upProbability;
+  final double? downProbability;
+  final double? flatProbability;
   final bool isFavorite;
   final VoidCallback? onTap;
   final VoidCallback? onToggleFavorite;
@@ -39,6 +42,9 @@ class SignalCard extends StatelessWidget {
     this.isSettled,
     this.isCorrect,
     this.qualityScore,
+    this.upProbability,
+    this.downProbability,
+    this.flatProbability,
     this.isFavorite = false,
     this.onTap,
     this.onToggleFavorite,
@@ -99,6 +105,19 @@ class SignalCard extends StatelessWidget {
       '^HSI': '恒生指数',
       '000001.SS': '上证指数',
       '399001.SZ': '深证成指',
+      // 日股
+      '7203.JP': '丰田汽车',
+      '6758.JP': '索尼集团',
+      '6861.JP': '基恩士',
+      '9984.JP': '软银集团',
+      '8306.JP': '三菱日联',
+      // 欧股
+      'SAP.DE': 'SAP 思爱普',
+      'SIE.DE': '西门子',
+      'BMW.DE': '宝马',
+      'ASML.NL': 'ASML 阿斯麦',
+      'MC.PA': 'LVMH 路威酩轩',
+      'TTE.PA': '道达尔能源',
     };
     return nameMap[symbol] ?? symbol;
   }
@@ -151,8 +170,8 @@ class SignalCard extends StatelessWidget {
                       Flexible(
                         child: Text(
                           displayName,
-                          style: const TextStyle(
-                            color: AppTheme.textPrimary,
+                          style: TextStyle(
+                            color: AppTheme.textPrimaryOf(context),
                             fontSize: 17,
                             fontWeight: FontWeight.w600,
                             letterSpacing: 0.2,
@@ -288,7 +307,7 @@ class SignalCard extends StatelessWidget {
                         vertical: 2,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.surface,
+                        color: AppTheme.surfaceOf(context),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -306,6 +325,14 @@ class SignalCard extends StatelessWidget {
               ),
             ),
 
+            // ── Probability bars ──
+            if (upProbability != null &&
+                downProbability != null &&
+                flatProbability != null) ...[
+              const SizedBox(height: 10),
+              _buildProbabilityBars(context),
+            ],
+
             const SizedBox(height: 10),
 
             // ── Row 3: AI reasoning — HERO content, first thing to read ──
@@ -315,7 +342,7 @@ class SignalCard extends StatelessWidget {
                 padding:
                     const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
                 decoration: BoxDecoration(
-                  color: AppTheme.surface,
+                  color: AppTheme.surfaceOf(context),
                   borderRadius: BorderRadius.circular(8),
                   border: const Border(
                     left: BorderSide(
@@ -328,8 +355,8 @@ class SignalCard extends StatelessWidget {
                   cleanedReasoning,
                   maxLines: 3,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: AppTheme.textPrimary,
+                  style: TextStyle(
+                    color: AppTheme.textPrimaryOf(context),
                     fontSize: 13,
                     fontWeight: FontWeight.w400,
                     height: 1.5,
@@ -446,6 +473,55 @@ class SignalCard extends StatelessWidget {
     );
   }
 
+  /// Build probability distribution bars (green=up, red=down, gray=flat).
+  Widget _buildProbabilityBars(BuildContext context) {
+    final up = (upProbability! * 100).round();
+    final down = (downProbability! * 100).round();
+    final flat = (flatProbability! * 100).round();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        // Labels row
+        Text(
+          '看涨$up%  看跌$down%  观望$flat%',
+          style: TextStyle(
+            color: AppTheme.textSecondaryOf(context),
+            fontSize: 11,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 5),
+        // Stacked bars
+        ClipRRect(
+          borderRadius: BorderRadius.circular(3),
+          child: SizedBox(
+            height: 6,
+            child: Row(
+              children: [
+                if (upProbability! > 0)
+                  Flexible(
+                    flex: up.clamp(1, 100),
+                    child: Container(color: AppTheme.upGreen),
+                  ),
+                if (downProbability! > 0)
+                  Flexible(
+                    flex: down.clamp(1, 100),
+                    child: Container(color: AppTheme.downRed),
+                  ),
+                if (flatProbability! > 0)
+                  Flexible(
+                    flex: flat.clamp(1, 100),
+                    child: Container(color: AppTheme.flatGray),
+                  ),
+              ],
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// Build a context string for the deviation, e.g. "当前偏高2.1%"
   String _deviationContext() {
     if (changePct == null) return '';
@@ -484,9 +560,9 @@ class SignalCard extends StatelessWidget {
       context: context,
       backgroundColor: Colors.transparent,
       builder: (ctx) => Container(
-        decoration: const BoxDecoration(
-          color: AppTheme.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundOf(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
         child: Column(
@@ -505,12 +581,12 @@ class SignalCard extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 20),
-            const Text(
+            Text(
               '看懂信号卡',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimaryOf(context),
               ),
             ),
             const SizedBox(height: 16),

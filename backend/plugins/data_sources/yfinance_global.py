@@ -70,6 +70,12 @@ STOOQ_MAP = {
     "PLATINUM": "pl.f", "PALLADIUM": "pa.f",
     "WHEAT": "zw.f", "CORN": "zc.f", "SOYBEANS": "zs.f",
     "COFFEE": "kc.f", "COTTON": "ct.f",
+    # R15 — Japanese stocks
+    "7203.JP": "7203.jp", "6758.JP": "6758.jp", "6861.JP": "6861.jp",
+    "9984.JP": "9984.jp", "8306.JP": "8306.jp",
+    # R15 — European stocks
+    "SAP.DE": "sap.de", "SIE.DE": "sie.de", "BMW.DE": "bmw.de",
+    "ASML.NL": "asml.nl", "MC.PA": "mc.fr", "TTE.PA": "tte.fr",
 }
 
 # yfinance symbol map (fallback)
@@ -109,6 +115,12 @@ YFINANCE_MAP = {
     "PLATINUM": "PL=F", "PALLADIUM": "PA=F",
     "WHEAT": "ZW=F", "CORN": "ZC=F", "SOYBEANS": "ZS=F",
     "COFFEE": "KC=F", "COTTON": "CT=F",
+    # R15 — Japanese stocks
+    "7203.JP": "7203.T", "6758.JP": "6758.T", "6861.JP": "6861.T",
+    "9984.JP": "9984.T", "8306.JP": "8306.T",
+    # R15 — European stocks
+    "SAP.DE": "SAP.DE", "SIE.DE": "SIE.DE", "BMW.DE": "BMW.DE",
+    "ASML.NL": "ASML.AS", "MC.PA": "MC.PA", "TTE.PA": "TTE.PA",
 }
 
 # Market type classification
@@ -137,6 +149,8 @@ COMMODITIES = {
     "GOLD", "OIL", "SILVER", "NATGAS", "COPPER",
     "PLATINUM", "PALLADIUM", "WHEAT", "CORN", "SOYBEANS", "COFFEE", "COTTON",
 }
+JP_STOCKS = {"7203.JP", "6758.JP", "6861.JP", "9984.JP", "8306.JP"}
+EU_STOCKS = {"SAP.DE", "SIE.DE", "BMW.DE", "ASML.NL", "MC.PA", "TTE.PA"}
 
 
 def _market_type_for(symbol: str) -> MarketType:
@@ -146,6 +160,10 @@ def _market_type_for(symbol: str) -> MarketType:
         return MarketType.US_EQUITIES
     if symbol in HK_STOCKS:
         return MarketType.HK_EQUITIES
+    if symbol in JP_STOCKS:
+        return MarketType.JP_EQUITIES
+    if symbol in EU_STOCKS:
+        return MarketType.EU_EQUITIES
     if symbol in INDICES:
         return MarketType.GLOBAL_INDICES
     if symbol in COMMODITIES:
@@ -176,6 +194,8 @@ class YFinanceDataSource(DataSourcePlugin):
         return [
             MarketType.US_EQUITIES,
             MarketType.HK_EQUITIES,
+            MarketType.JP_EQUITIES,
+            MarketType.EU_EQUITIES,
             MarketType.GLOBAL_INDICES,
             MarketType.COMMODITIES,
         ]

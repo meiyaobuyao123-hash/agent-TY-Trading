@@ -25,7 +25,7 @@ class MarketDetailPage extends ConsumerWidget {
     final judgmentsAsync = ref.watch(marketJudgmentsProvider(symbol));
 
     return Scaffold(
-      backgroundColor: AppTheme.background,
+      backgroundColor: AppTheme.backgroundOf(context),
       body: marketAsync.when(
         loading: () => const LoadingWidget(message: '加载中...'),
         error: (err, _) => AppErrorWidget.fromError(
@@ -100,10 +100,10 @@ class MarketDetailPage extends ConsumerWidget {
                                       snap?.price != null
                                           ? _formatPrice(snap!.price!)
                                           : '--',
-                                      style: const TextStyle(
+                                      style: TextStyle(
                                         fontSize: 40,
                                         fontWeight: FontWeight.w700,
-                                        color: AppTheme.textPrimary,
+                                        color: AppTheme.textPrimaryOf(context),
                                         letterSpacing: 1.2,
                                         height: 1.0,
                                         fontFeatures: [
@@ -718,9 +718,9 @@ class MarketDetailPage extends ConsumerWidget {
         minChildSize: 0.4,
         maxChildSize: 0.95,
         builder: (_, scrollController) => Container(
-          decoration: const BoxDecoration(
-            color: AppTheme.background,
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+          decoration: BoxDecoration(
+            color: AppTheme.backgroundOf(context),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
           ),
           child: Column(
             children: [

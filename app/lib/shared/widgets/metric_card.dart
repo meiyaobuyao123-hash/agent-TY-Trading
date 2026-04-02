@@ -51,8 +51,8 @@ class MetricCard extends StatelessWidget {
           // Small gray title
           Text(
             title,
-            style: const TextStyle(
-              color: AppTheme.textSecondary,
+            style: TextStyle(
+              color: AppTheme.textSecondaryOf(context),
               fontSize: 12,
               fontWeight: FontWeight.w400,
             ),

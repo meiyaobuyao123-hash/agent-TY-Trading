@@ -186,6 +186,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
           const SizedBox(height: 20),
 
+          // Today's highlights
+          _buildHighlightsSection(ref),
+
+          const SizedBox(height: 12),
+
           // AI Insights section
           _buildInsightsSection(ref),
 
@@ -364,7 +369,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       loading: () => Container(
         padding: const EdgeInsets.all(20),
         decoration: BoxDecoration(
-          color: AppTheme.surface,
+          color: AppTheme.surfaceOf(context),
           borderRadius: BorderRadius.circular(14),
         ),
         child: const Center(
@@ -401,7 +406,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         return Container(
           padding: const EdgeInsets.all(20),
           decoration: BoxDecoration(
-            color: AppTheme.surface,
+            color: AppTheme.surfaceOf(context),
             borderRadius: BorderRadius.circular(14),
           ),
           child: Column(
@@ -418,6 +423,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                       painter: _MiniAccuracyRingPainter(
                         percentage: overallAccuracy,
                         color: accuracyColor,
+                        trackColor: AppTheme.dividerOf(context),
                       ),
                       child: Center(
                         child: Text(
@@ -438,12 +444,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
+                        Text(
                           'AI 进化',
                           style: TextStyle(
                             fontSize: 16,
                             fontWeight: FontWeight.w600,
-                            color: AppTheme.textPrimary,
+                            color: AppTheme.textPrimaryOf(context),
                             letterSpacing: -0.2,
                           ),
                         ),
@@ -504,7 +510,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                 padding: const EdgeInsets.symmetric(
                     horizontal: 12, vertical: 8),
                 decoration: BoxDecoration(
-                  color: AppTheme.background,
+                  color: AppTheme.backgroundOf(context),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Row(
@@ -562,11 +568,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         children: [
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 18,
               fontWeight: FontWeight.w700,
-              color: AppTheme.textPrimary,
-              fontFeatures: [FontFeature.tabularFigures()],
+              color: AppTheme.textPrimaryOf(context),
+              fontFeatures: const [FontFeature.tabularFigures()],
             ),
           ),
           const SizedBox(height: 4),
@@ -587,7 +593,135 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return Container(
       width: 0.5,
       height: 32,
-      color: AppTheme.divider,
+      color: AppTheme.dividerOf(context),
+    );
+  }
+
+  // ── Today's highlights section ──
+  Widget _buildHighlightsSection(WidgetRef ref) {
+    final insightsAsync = ref.watch(insightsProvider);
+    final statsAsync = ref.watch(overviewStatsProvider);
+
+    return insightsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (insightsData) {
+        final bigDev = insightsData['biggest_deviation'] as Map<String, dynamic>?;
+
+        // Build highlight cards
+        final cards = <Widget>[];
+
+        // 1. Biggest deviation highlight
+        if (bigDev != null) {
+          final devPct = (bigDev['deviation_pct'] as num?)?.toDouble() ?? 0;
+          final sym = bigDev['symbol'] as String? ?? '--';
+          final isOvervalued = devPct < 0;
+          cards.add(_highlightCard(
+            emoji: '\ud83d\udd25',
+            text: '$sym \u504f\u79bb${devPct.abs().toStringAsFixed(1)}% \u2014 AI\u8ba4\u4e3a\u88ab${isOvervalued ? "\u4e25\u91cd\u9ad8\u4f30" : "\u4e25\u91cd\u4f4e\u4f30"}',
+            color: AppTheme.downRed,
+          ));
+        }
+
+        // 2. Fear & Greed from overview stats
+        statsAsync.whenData((stats) {
+          final breadth = stats['market_breadth'] as Map<String, dynamic>?;
+          if (breadth != null) {
+            final mood = breadth['mood'] as String? ?? '\u4e2d\u6027';
+            final upPct = (breadth['up_pct'] as num?)?.toDouble() ?? 50;
+            String emoji;
+            Color moodColor;
+            if (upPct < 30) {
+              emoji = '\ud83d\ude30';
+              moodColor = AppTheme.downRed;
+            } else if (upPct > 70) {
+              emoji = '\ud83e\udd11';
+              moodColor = AppTheme.upGreen;
+            } else {
+              emoji = '\ud83d\ude10';
+              moodColor = AppTheme.flatGray;
+            }
+            cards.add(_highlightCard(
+              emoji: emoji,
+              text: '\u5e02\u573a\u60c5\u7eea: $mood (${upPct.toStringAsFixed(0)}%\u4e0a\u6da8)',
+              color: moodColor,
+            ));
+          }
+        });
+
+        if (cards.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 7,
+                  height: 7,
+                  decoration: const BoxDecoration(
+                    color: Color(0xFFFF6B6B),
+                    shape: BoxShape.circle,
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '\u4eca\u65e5\u4eae\u70b9',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: AppTheme.textPrimaryOf(context),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 10),
+            SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              child: Row(
+                children: cards.map((c) => Padding(
+                  padding: const EdgeInsets.only(right: 10),
+                  child: c,
+                )).toList(),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _highlightCard({
+    required String emoji,
+    required String text,
+    required Color color,
+  }) {
+    return Container(
+      constraints: const BoxConstraints(maxWidth: 260),
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.08),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(color: color.withValues(alpha: 0.2), width: 0.5),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(emoji, style: const TextStyle(fontSize: 18)),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              text,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w600,
+                color: color,
+                height: 1.3,
+              ),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -623,12 +757,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   ),
                 ),
                 const SizedBox(width: 8),
-                const Text(
+                Text(
                   'AI 洞察',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimary,
+                    color: AppTheme.textPrimaryOf(context),
                   ),
                 ),
               ],
@@ -687,7 +821,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       width: 150,
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: AppTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -714,10 +848,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           const SizedBox(height: 4),
           Text(
             value,
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 15,
               fontWeight: FontWeight.w600,
-              color: AppTheme.textPrimary,
+              color: AppTheme.textPrimaryOf(context),
             ),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
@@ -823,7 +957,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       crossAxisAlignment: CrossAxisAlignment.end,
       children: [
         // Left: title
-        const Column(
+        Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Text(
@@ -831,16 +965,16 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
               style: TextStyle(
                 fontSize: 28,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimaryOf(context),
                 letterSpacing: -0.5,
               ),
             ),
-            SizedBox(height: 2),
+            const SizedBox(height: 2),
             Text(
               'AI 金融世界模型',
               style: TextStyle(
                 fontSize: 14,
-                color: AppTheme.textSecondary,
+                color: AppTheme.textSecondaryOf(context),
                 fontWeight: FontWeight.w400,
               ),
             ),
@@ -893,10 +1027,10 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           children: [
             Text(
               timeStr,
-              style: const TextStyle(
+              style: TextStyle(
                 fontSize: 22,
                 fontWeight: FontWeight.w600,
-                color: AppTheme.textPrimary,
+                color: AppTheme.textPrimaryOf(context),
                 letterSpacing: -0.5,
               ),
             ),
@@ -925,9 +1059,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
         constraints: BoxConstraints(
           maxHeight: MediaQuery.of(context).size.height * 0.6,
         ),
-        decoration: const BoxDecoration(
-          color: AppTheme.background,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundOf(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
         ),
         padding: const EdgeInsets.fromLTRB(24, 12, 24, 24),
         child: Column(
@@ -1051,7 +1185,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: AppTheme.surface,
+        color: AppTheme.surfaceOf(context),
         borderRadius: BorderRadius.circular(14),
       ),
       child: Column(
@@ -1271,12 +1405,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           ),
         ),
         const SizedBox(width: 8),
-        const Text(
+        Text(
           '实时 AI 信号',
           style: TextStyle(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: AppTheme.textPrimary,
+            color: AppTheme.textPrimaryOf(context),
           ),
         ),
       ],
@@ -1323,6 +1457,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
       isSettled: j.isSettled,
       isCorrect: j.isCorrect,
       qualityScore: j.qualityScore,
+      upProbability: j.upProbability,
+      downProbability: j.downProbability,
+      flatProbability: j.flatProbability,
       isFavorite: isFavorite,
       onToggleFavorite: onToggleFavorite,
       onTap: () {
@@ -1338,8 +1475,13 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 class _MiniAccuracyRingPainter extends CustomPainter {
   final double percentage;
   final Color color;
+  final Color trackColor;
 
-  _MiniAccuracyRingPainter({required this.percentage, required this.color});
+  _MiniAccuracyRingPainter({
+    required this.percentage,
+    required this.color,
+    this.trackColor = const Color(0xFFF2F2F7),
+  });
 
   @override
   void paint(Canvas canvas, Size size) {
@@ -1347,7 +1489,7 @@ class _MiniAccuracyRingPainter extends CustomPainter {
     final radius = (math.min(size.width, size.height) - 8) / 2;
 
     final trackPaint = Paint()
-      ..color = const Color(0xFFF2F2F7)
+      ..color = trackColor
       ..style = PaintingStyle.stroke
       ..strokeWidth = 5
       ..strokeCap = StrokeCap.round;

@@ -62,6 +62,9 @@ class Judgment {
   final String? reasoning;
   final List<ModelVote>? modelVotes;
   final double? qualityScore;
+  final double? upProbability;
+  final double? downProbability;
+  final double? flatProbability;
   final List<BiasFlag>? biasFlags;
   final bool isLowConfidence;
   final int horizonHours;
@@ -82,6 +85,9 @@ class Judgment {
     this.reasoning,
     this.modelVotes,
     this.qualityScore,
+    this.upProbability,
+    this.downProbability,
+    this.flatProbability,
     this.biasFlags,
     this.isLowConfidence = false,
     required this.horizonHours,
@@ -118,6 +124,9 @@ class Judgment {
       reasoning: json['reasoning'] as String?,
       modelVotes: votes,
       qualityScore: (json['quality_score'] as num?)?.toDouble(),
+      upProbability: (json['up_probability'] as num?)?.toDouble(),
+      downProbability: (json['down_probability'] as num?)?.toDouble(),
+      flatProbability: (json['flat_probability'] as num?)?.toDouble(),
       biasFlags: biasFlags,
       isLowConfidence: json['is_low_confidence'] as bool? ?? false,
       horizonHours: json['horizon_hours'] as int? ?? 4,

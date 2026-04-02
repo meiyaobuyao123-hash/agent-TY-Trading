@@ -27,6 +27,8 @@ class _AccuracyPageState extends ConsumerState<AccuracyPage>
     'cn-equities': 'A股',
     'us-equities': '美股',
     'hk-equities': '港股',
+    'jp-equities': '日股',
+    'eu-equities': '欧股',
     'global-indices': '全球指数',
     'forex': '外汇',
     'commodities': '大宗商品',
