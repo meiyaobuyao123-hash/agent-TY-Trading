@@ -1082,3 +1082,272 @@ async def get_daily_summary(
         down_count=down_count,
         flat_count=flat_count,
     )
+
+
+# ── Per-Market Stats ─────────────────────────────────────────────────
+
+
+class RegimeAccuracy(BaseModel):
+    regime: str
+    total: int
+    correct: int
+    accuracy_pct: float
+
+
+class MarketStatsResponse(BaseModel):
+    symbol: str
+    total_judgments: int
+    settled_judgments: int
+    correct_judgments: int
+    accuracy_pct: float
+    avg_confidence: float
+    streak: int  # positive = consecutive correct, negative = consecutive incorrect
+    streak_type: str  # "correct" or "incorrect"
+    best_regime: Optional[str] = None
+    best_regime_accuracy: Optional[float] = None
+    regime_breakdown: list[RegimeAccuracy] = []
+
+
+@router.get("/market-stats/{symbol}", response_model=MarketStatsResponse)
+async def get_market_stats(
+    symbol: str,
+    session: AsyncSession = Depends(get_session),
+) -> MarketStatsResponse:
+    """返回单个市场的详细统计数据。"""
+    # Find the market
+    market_stmt = select(Market).where(Market.symbol == symbol)
+    market_result = await session.execute(market_stmt)
+    market = market_result.scalar_one_or_none()
+    if not market:
+        from fastapi import HTTPException
+        raise HTTPException(status_code=404, detail=f"市场 {symbol} 未找到")
+
+    # Total judgments
+    total_stmt = select(func.count()).select_from(Judgment).where(
+        Judgment.market_id == market.id
+    )
+    total_result = await session.execute(total_stmt)
+    total_judgments = total_result.scalar() or 0
+
+    # Average confidence
+    avg_conf_stmt = select(func.avg(Judgment.confidence_score)).where(
+        Judgment.market_id == market.id
+    )
+    avg_conf_result = await session.execute(avg_conf_stmt)
+    avg_confidence = avg_conf_result.scalar() or 0.0
+
+    # Settled judgments with correctness
+    settled_stmt = (
+        select(Judgment, Settlement)
+        .join(Settlement, Settlement.judgment_id == Judgment.id)
+        .where(
+            Judgment.market_id == market.id,
+            Settlement.is_correct.isnot(None),
+        )
+        .order_by(desc(Judgment.created_at))
+    )
+    settled_result = await session.execute(settled_stmt)
+    settled_rows = settled_result.all()
+
+    settled_judgments = len(settled_rows)
+    correct_judgments = sum(1 for _, s in settled_rows if s.is_correct)
+    accuracy_pct = round((correct_judgments / settled_judgments) * 100, 1) if settled_judgments > 0 else 0.0
+
+    # Streak (consecutive correct/incorrect from most recent)
+    streak = 0
+    streak_type = "correct"
+    if settled_rows:
+        first_correct = settled_rows[0][1].is_correct
+        streak_type = "correct" if first_correct else "incorrect"
+        for _, s in settled_rows:
+            if s.is_correct == first_correct:
+                streak += 1
+            else:
+                break
+        if not first_correct:
+            streak = -streak
+
+    # Regime breakdown
+    regime_stats: dict[str, dict] = {}
+    for j, s in settled_rows:
+        regime_info = j.regime or {}
+        regime_name = regime_info.get("regime", "未知") if isinstance(regime_info, dict) else "未知"
+        if regime_name not in regime_stats:
+            regime_stats[regime_name] = {"total": 0, "correct": 0}
+        regime_stats[regime_name]["total"] += 1
+        if s.is_correct:
+            regime_stats[regime_name]["correct"] += 1
+
+    regime_breakdown = []
+    best_regime = None
+    best_regime_accuracy = None
+    for regime_name, stats in regime_stats.items():
+        acc = round((stats["correct"] / stats["total"]) * 100, 1) if stats["total"] > 0 else 0.0
+        regime_breakdown.append(RegimeAccuracy(
+            regime=regime_name,
+            total=stats["total"],
+            correct=stats["correct"],
+            accuracy_pct=acc,
+        ))
+        if stats["total"] >= 2 and (best_regime_accuracy is None or acc > best_regime_accuracy):
+            best_regime = regime_name
+            best_regime_accuracy = acc
+
+    regime_breakdown.sort(key=lambda r: r.accuracy_pct, reverse=True)
+
+    return MarketStatsResponse(
+        symbol=symbol,
+        total_judgments=total_judgments,
+        settled_judgments=settled_judgments,
+        correct_judgments=correct_judgments,
+        accuracy_pct=accuracy_pct,
+        avg_confidence=round(avg_confidence, 3),
+        streak=streak,
+        streak_type=streak_type,
+        best_regime=best_regime,
+        best_regime_accuracy=best_regime_accuracy,
+        regime_breakdown=regime_breakdown,
+    )
+
+
+# ── Global View (region summary) ─────────────────────────────────────
+
+
+class RegionSummaryItem(BaseModel):
+    region: str
+    market_types: list[str]
+    total_markets: int
+    up_pct: float
+    down_pct: float
+    flat_pct: float
+    dominant_direction: str  # "看涨" / "看跌" / "中性" / "暂无数据"
+
+
+class GlobalViewResponse(BaseModel):
+    regions: list[RegionSummaryItem]
+    summary_text: str
+
+
+@router.get("/global-view", response_model=GlobalViewResponse)
+async def get_global_view(
+    session: AsyncSession = Depends(get_session),
+) -> GlobalViewResponse:
+    """返回全球各地区最新判断的方向汇总。"""
+    # Define regions
+    region_map = {
+        "美国": ["us-equities", "etf"],
+        "中国": ["cn-equities", "hk-equities"],
+        "日本": ["jp-equities"],
+        "韩国": ["kr-equities"],
+        "印度": ["in-equities"],
+        "欧洲": ["eu-equities", "uk-equities"],
+        "大洋洲": ["au-equities"],
+        "新加坡": ["sg-equities"],
+        "台湾": ["tw-equities"],
+        "加密": ["crypto"],
+        "全球": ["forex", "commodities", "global-indices", "macro"],
+        "拉美": ["latam-equities"],
+        "中东": ["mena-equities"],
+    }
+
+    region_flags = {
+        "美国": "\U0001f1fa\U0001f1f8",
+        "中国": "\U0001f1e8\U0001f1f3",
+        "日本": "\U0001f1ef\U0001f1f5",
+        "韩国": "\U0001f1f0\U0001f1f7",
+        "印度": "\U0001f1ee\U0001f1f3",
+        "欧洲": "\U0001f1ea\U0001f1fa",
+        "大洋洲": "\U0001f1e6\U0001f1fa",
+        "新加坡": "\U0001f1f8\U0001f1ec",
+        "台湾": "\U0001f1f9\U0001f1fc",  # Note: use generic flag
+        "加密": "\U0001f310",
+        "全球": "\U0001f30d",
+        "拉美": "\U0001f30e",
+        "中东": "\U0001f1f8\U0001f1e6",
+    }
+
+    # Get latest judgment per market (single query)
+    latest_sub = (
+        select(
+            Judgment.market_id,
+            func.max(Judgment.created_at).label("max_at"),
+        )
+        .group_by(Judgment.market_id)
+        .subquery()
+    )
+    judgment_stmt = (
+        select(Judgment.direction, Market.market_type)
+        .join(
+            latest_sub,
+            and_(
+                Judgment.market_id == latest_sub.c.market_id,
+                Judgment.created_at == latest_sub.c.max_at,
+            ),
+        )
+        .join(Market, Market.id == Judgment.market_id)
+        .where(Market.is_active == True)
+    )
+    judgment_result = await session.execute(judgment_stmt)
+    rows = judgment_result.all()
+
+    # Group by market_type
+    type_directions: dict[str, list[str]] = {}
+    for direction, mt in rows:
+        type_directions.setdefault(mt, []).append(direction)
+
+    # Also count total markets per type
+    market_count_stmt = (
+        select(Market.market_type, func.count())
+        .where(Market.is_active == True)
+        .group_by(Market.market_type)
+    )
+    mc_result = await session.execute(market_count_stmt)
+    market_counts = dict(mc_result.all())
+
+    regions = []
+    summary_parts = []
+    for region_name, types in region_map.items():
+        total_markets = sum(market_counts.get(t, 0) for t in types)
+        if total_markets == 0:
+            continue
+
+        all_dirs = []
+        for t in types:
+            all_dirs.extend(type_directions.get(t, []))
+
+        if not all_dirs:
+            dominant = "暂无数据"
+            up_pct = down_pct = flat_pct = 0.0
+        else:
+            up_c = sum(1 for d in all_dirs if d == "up")
+            down_c = sum(1 for d in all_dirs if d == "down")
+            flat_c = sum(1 for d in all_dirs if d == "flat")
+            n = len(all_dirs)
+            up_pct = round(up_c / n * 100, 1)
+            down_pct = round(down_c / n * 100, 1)
+            flat_pct = round(flat_c / n * 100, 1)
+            if up_pct > down_pct and up_pct > flat_pct:
+                dominant = f"{up_pct:.0f}%看涨"
+            elif down_pct > up_pct and down_pct > flat_pct:
+                dominant = f"{down_pct:.0f}%看跌"
+            else:
+                dominant = "中性"
+
+        flag = region_flags.get(region_name, "")
+        regions.append(RegionSummaryItem(
+            region=region_name,
+            market_types=types,
+            total_markets=total_markets,
+            up_pct=up_pct,
+            down_pct=down_pct,
+            flat_pct=flat_pct,
+            dominant_direction=dominant,
+        ))
+        summary_parts.append(f"{flag} {region_name}: {dominant}")
+
+    summary_text = " | ".join(summary_parts)
+
+    return GlobalViewResponse(
+        regions=regions,
+        summary_text=summary_text,
+    )

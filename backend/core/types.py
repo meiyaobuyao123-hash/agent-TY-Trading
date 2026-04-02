@@ -30,6 +30,8 @@ class MarketType(str, Enum):
     MENA_EQUITIES = "mena-equities"
     UK_EQUITIES = "uk-equities"
     AU_EQUITIES = "au-equities"
+    SG_EQUITIES = "sg-equities"
+    TW_EQUITIES = "tw-equities"
 
 
 class Timeframe(str, Enum):

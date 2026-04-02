@@ -37,6 +37,8 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     'au-equities': '澳股',
     'latam-equities': '拉美股',
     'mena-equities': '中东股',
+    'sg-equities': '新加坡',
+    'tw-equities': '台股',
   };
 
   static const _filterChips = [
@@ -63,7 +65,9 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
     '\u{1F1EF}\u{1F1F5} 日本': ['jp-equities'],
     '\u{1F1F0}\u{1F1F7} 韩国': ['kr-equities'],
     '\u{1F1EE}\u{1F1F3} 印度': ['in-equities'],
+    '\u{1F1F9}\u{1F1FC} 台湾': ['tw-equities'],
     '\u{1F1EA}\u{1F1FA} 欧洲': ['eu-equities', 'uk-equities'],
+    '\u{1F1F8}\u{1F1EC} 新加坡': ['sg-equities'],
     '\u{1F1E6}\u{1F1FA} 大洋洲': ['au-equities'],
     '\u{1F30D} 全球': ['forex', 'commodities', 'global-indices', 'crypto', 'macro', 'prediction-markets', 'latam-equities', 'mena-equities'],
   };
@@ -329,6 +333,12 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
               ),
             ),
           ),
+
+          // Global view summary (when region view active + "全部")
+          if (_groupByRegion && _selectedFilter == null)
+            SliverToBoxAdapter(
+              child: _GlobalViewSummary(),
+            ),
 
           // Compare hint bar
           if (_compareSelection.length == 1)
@@ -615,6 +625,86 @@ class _MarketRow extends StatelessWidget {
     if (price >= 1000) return price.toStringAsFixed(0);
     if (price >= 1) return price.toStringAsFixed(2);
     return price.toStringAsFixed(4);
+  }
+}
+
+/// Global view summary — shows region-level direction summary.
+class _GlobalViewSummary extends ConsumerWidget {
+  @override
+  Widget build(BuildContext context, WidgetRef ref) {
+    final globalViewAsync = ref.watch(globalViewProvider);
+
+    return globalViewAsync.when(
+      loading: () => Padding(
+        padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+        child: Container(
+          height: 40,
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: BorderRadius.circular(10),
+          ),
+          child: const Center(
+            child: SizedBox(
+              width: 16,
+              height: 16,
+              child: CircularProgressIndicator(strokeWidth: 2),
+            ),
+          ),
+        ),
+      ),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (data) {
+        final summaryText = data['summary_text'] as String? ?? '';
+        if (summaryText.isEmpty) return const SizedBox.shrink();
+
+        return Padding(
+          padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+          child: Container(
+            width: double.infinity,
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              color: AppTheme.primary.withValues(alpha: 0.06),
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: AppTheme.primary.withValues(alpha: 0.15),
+              ),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(
+                      Icons.public_rounded,
+                      size: 14,
+                      color: AppTheme.primary,
+                    ),
+                    const SizedBox(width: 6),
+                    Text(
+                      '全球视图',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w600,
+                        color: AppTheme.primary,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  summaryText,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: AppTheme.textSecondaryOf(context),
+                    height: 1.4,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 }
 

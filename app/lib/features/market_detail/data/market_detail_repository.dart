@@ -51,4 +51,14 @@ class MarketDetailRepository {
       return [];
     }
   }
+
+  /// Fetch per-market statistics (accuracy, streak, regime breakdown).
+  Future<Map<String, dynamic>> fetchMarketStats(String symbol) async {
+    try {
+      final response = await _dio.get('/stats/market-stats/$symbol');
+      return response.data as Map<String, dynamic>;
+    } catch (_) {
+      return {};
+    }
+  }
 }

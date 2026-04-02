@@ -240,6 +240,14 @@ class MarketDetailPage extends ConsumerWidget {
                   ),
                 ),
 
+                // ── Section 3b: 市场统计 — per-market stats ──
+                SliverToBoxAdapter(
+                  child: Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 24, 16, 0),
+                    child: _buildMarketStatsSection(context, ref),
+                  ),
+                ),
+
                 // ── Section 4: 相关市场 — horizontal scroll ──
                 SliverToBoxAdapter(
                   child: Padding(
@@ -359,6 +367,137 @@ class MarketDetailPage extends ConsumerWidget {
 
         return _PriceChart(snapshots: validSnaps);
       },
+    );
+  }
+
+  // ── Market stats section ──
+  Widget _buildMarketStatsSection(BuildContext context, WidgetRef ref) {
+    final statsAsync = ref.watch(marketStatsProvider(symbol));
+
+    return statsAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, __) => const SizedBox.shrink(),
+      data: (stats) {
+        if (stats.isEmpty) return const SizedBox.shrink();
+        final totalJ = stats['total_judgments'] as int? ?? 0;
+        if (totalJ == 0) return const SizedBox.shrink();
+
+        final accuracy = (stats['accuracy_pct'] as num?)?.toDouble() ?? 0.0;
+        final avgConf = (stats['avg_confidence'] as num?)?.toDouble() ?? 0.0;
+        final streak = stats['streak'] as int? ?? 0;
+        final streakType = stats['streak_type'] as String? ?? 'correct';
+        final bestRegime = stats['best_regime'] as String?;
+        final bestRegimeAcc = (stats['best_regime_accuracy'] as num?)?.toDouble();
+
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.cardColorOf(context),
+            borderRadius: BorderRadius.circular(14),
+            boxShadow: [
+              BoxShadow(
+                color: const Color(0xFF000000).withValues(alpha: 0.04),
+                blurRadius: 8,
+                offset: const Offset(0, 1),
+              ),
+            ],
+          ),
+          padding: const EdgeInsets.all(16),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                '市场统计',
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimaryOf(context),
+                  letterSpacing: -0.3,
+                ),
+              ),
+              const SizedBox(height: 14),
+              // Stats grid
+              Row(
+                children: [
+                  Expanded(
+                    child: _statItem(
+                      '总判断',
+                      totalJ.toString(),
+                      AppTheme.primary,
+                    ),
+                  ),
+                  Expanded(
+                    child: _statItem(
+                      '准确率',
+                      '${accuracy.toStringAsFixed(1)}%',
+                      accuracy > 50
+                          ? AppTheme.upGreen
+                          : accuracy > 30
+                              ? AppTheme.flatGray
+                              : AppTheme.downRed,
+                    ),
+                  ),
+                  Expanded(
+                    child: _statItem(
+                      '平均置信度',
+                      '${(avgConf * 100).toStringAsFixed(0)}%',
+                      AppTheme.primary,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              Row(
+                children: [
+                  Expanded(
+                    child: _statItem(
+                      '连续${streakType == "correct" ? "正确" : "错误"}',
+                      '${streak.abs()}次',
+                      streak > 0 ? AppTheme.upGreen : AppTheme.downRed,
+                    ),
+                  ),
+                  if (bestRegime != null && bestRegimeAcc != null)
+                    Expanded(
+                      child: _statItem(
+                        '最佳行情',
+                        '$bestRegime ${bestRegimeAcc.toStringAsFixed(0)}%',
+                        AppTheme.primary,
+                      ),
+                    ),
+                  if (bestRegime == null)
+                    const Expanded(child: SizedBox.shrink()),
+                  const Expanded(child: SizedBox.shrink()),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _statItem(String label, String value, Color color) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Text(
+          label,
+          style: const TextStyle(
+            fontSize: 11,
+            color: AppTheme.textSecondary,
+            fontWeight: FontWeight.w500,
+          ),
+        ),
+        const SizedBox(height: 4),
+        Text(
+          value,
+          style: TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.w700,
+            color: color,
+            fontFeatures: const [FontFeature.tabularFigures()],
+          ),
+        ),
+      ],
     );
   }
 

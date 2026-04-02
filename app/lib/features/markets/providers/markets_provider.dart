@@ -13,3 +13,10 @@ final marketsProvider = FutureProvider<List<Market>>((ref) async {
   final repo = ref.watch(marketsRepositoryProvider);
   return repo.fetchMarkets();
 });
+
+/// Global view summary data.
+final globalViewProvider = FutureProvider<Map<String, dynamic>>((ref) async {
+  final dio = ref.watch(dioProvider);
+  final response = await dio.get('/stats/global-view');
+  return response.data as Map<String, dynamic>;
+});

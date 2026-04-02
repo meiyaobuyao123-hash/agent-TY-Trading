@@ -117,6 +117,16 @@ STOOQ_MAP = {
     # R19 — US fintech/insurance
     "FIS": "fis.us", "FISV": "fisv.us", "PGR": "pgr.us",
     "ALL": "all.us", "TRV": "trv.us",
+    # R22 — More US stocks (fintech/growth)
+    "DASH": "dash.us", "LYFT": "lyft.us", "RIVN": "rivn.us", "LCID": "lcid.us",
+    "SOFI": "sofi.us", "HOOD": "hood.us", "AFRM": "afrm.us", "PATH": "path.us",
+    "UPST": "upst.us",
+    # R22 — Singapore stocks
+    "D05.SG": "d05.sg", "O39.SG": "o39.sg", "U11.SG": "u11.sg",
+    # R22 — Taiwan stocks
+    "2330.TW": "2330.tw", "2317.TW": "2317.tw", "2454.TW": "2454.tw",
+    # R22 — More European stocks
+    "NOVO-B.CO": "novo-b.co", "ABI.BR": "abi.br", "OR.PA": "or.fr",
 }
 
 # yfinance symbol map (fallback)
@@ -196,6 +206,16 @@ YFINANCE_MAP = {
     # R19 — US fintech/insurance
     "FIS": "FIS", "FISV": "FISV", "PGR": "PGR",
     "ALL": "ALL", "TRV": "TRV",
+    # R22 — More US stocks
+    "DASH": "DASH", "LYFT": "LYFT", "RIVN": "RIVN", "LCID": "LCID",
+    "SOFI": "SOFI", "HOOD": "HOOD", "AFRM": "AFRM", "PATH": "PATH",
+    "UPST": "UPST",
+    # R22 — Singapore stocks
+    "D05.SG": "D05.SI", "O39.SG": "O39.SI", "U11.SG": "U11.SI",
+    # R22 — Taiwan stocks
+    "2330.TW": "2330.TW", "2317.TW": "2317.TW", "2454.TW": "2454.TW",
+    # R22 — More European stocks
+    "NOVO-B.CO": "NOVO-B.CO", "ABI.BR": "ABI.BR", "OR.PA": "OR.PA",
     # R21 — UK stocks
     "SHEL.UK": "SHEL.L", "AZN.UK": "AZN.L", "HSBA.UK": "HSBA.L",
     "ULVR.UK": "ULVR.L", "BP.UK": "BP.L", "GSK.UK": "GSK.L",
@@ -226,6 +246,8 @@ US_STOCKS = {
     "CMCSA", "T", "VZ", "TMUS",
     "TGT", "LOW", "LULU", "EL",
     "FIS", "FISV", "PGR", "ALL", "TRV",
+    # R22 expansion
+    "DASH", "LYFT", "RIVN", "LCID", "SOFI", "HOOD", "AFRM", "PATH", "UPST",
 }
 ETFS = {
     "SPY", "QQQ", "IWM", "DIA", "GLD", "SLV", "USO", "TLT",
@@ -241,13 +263,15 @@ COMMODITIES = {
     "PLATINUM", "PALLADIUM", "WHEAT", "CORN", "SOYBEANS", "COFFEE", "COTTON",
 }
 JP_STOCKS = {"7203.JP", "6758.JP", "6861.JP", "9984.JP", "8306.JP"}
-EU_STOCKS = {"SAP.DE", "SIE.DE", "BMW.DE", "ASML.NL", "MC.PA", "TTE.PA"}
+EU_STOCKS = {"SAP.DE", "SIE.DE", "BMW.DE", "ASML.NL", "MC.PA", "TTE.PA", "NOVO-B.CO", "ABI.BR", "OR.PA"}
 KR_STOCKS = {"005930.KR", "000660.KR", "373220.KR", "005380.KR", "035420.KR"}
 IN_STOCKS = {"RELIANCE.IN", "TCS.IN", "INFY.IN", "HDFCBANK.IN", "BHARTIARTL.IN"}
 LATAM_STOCKS = {"MELI", "NU", "PBR", "VALE", "ITUB", "BBD"}
 MENA_STOCKS = {"2222.SR", "GFI"}
 UK_STOCKS = {"SHEL.UK", "AZN.UK", "HSBA.UK", "ULVR.UK", "BP.UK", "GSK.UK", "RIO.UK", "VOD.UK"}
 AU_STOCKS = {"BHP.AU", "CBA.AU", "CSL.AU", "WBC.AU", "NAB.AU", "MQG.AU"}
+SG_STOCKS = {"D05.SG", "O39.SG", "U11.SG"}
+TW_STOCKS = {"2330.TW", "2317.TW", "2454.TW"}
 
 
 def _market_type_for(symbol: str) -> MarketType:
@@ -273,6 +297,10 @@ def _market_type_for(symbol: str) -> MarketType:
         return MarketType.UK_EQUITIES
     if symbol in AU_STOCKS:
         return MarketType.AU_EQUITIES
+    if symbol in SG_STOCKS:
+        return MarketType.SG_EQUITIES
+    if symbol in TW_STOCKS:
+        return MarketType.TW_EQUITIES
     if symbol in INDICES:
         return MarketType.GLOBAL_INDICES
     if symbol in COMMODITIES:
@@ -313,6 +341,8 @@ class YFinanceDataSource(DataSourcePlugin):
             MarketType.MENA_EQUITIES,
             MarketType.UK_EQUITIES,
             MarketType.AU_EQUITIES,
+            MarketType.SG_EQUITIES,
+            MarketType.TW_EQUITIES,
         ]
 
     async def initialize(self, config: dict) -> None:

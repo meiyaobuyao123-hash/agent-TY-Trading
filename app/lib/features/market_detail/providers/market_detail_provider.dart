@@ -39,3 +39,10 @@ final relatedMarketsProvider =
   final repo = ref.watch(marketDetailRepositoryProvider);
   return repo.fetchRelatedMarkets(symbol);
 });
+
+/// Provides per-market statistics (accuracy, streak, regime, etc.).
+final marketStatsProvider =
+    FutureProvider.family<Map<String, dynamic>, String>((ref, symbol) async {
+  final repo = ref.watch(marketDetailRepositoryProvider);
+  return repo.fetchMarketStats(symbol);
+});

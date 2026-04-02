@@ -81,6 +81,17 @@ SYMBOL_MAP = {
     "W-USD": "WUSDT",
     "ONDO-USD": "ONDOUSDT",
     "JTO-USD": "JTOUSDT",
+    # Round 22 — GameFi/Metaverse/DeFi expansion
+    "TAO-USD": "TAOUSDT",
+    "JASMY-USD": "JASMYUSDT",
+    "GRT-USD": "GRTUSDT",
+    "FTM-USD": "FTMUSDT",
+    "SAND-USD": "SANDUSDT",
+    "MANA-USD": "MANAUSDT",
+    "AXS-USD": "AXSUSDT",
+    "GALA-USD": "GALAUSDT",
+    "IMX-USD": "IMXUSDT",
+    "LDO-USD": "LDOUSDT",
 }
 
 REVERSE_MAP = {v: k for k, v in SYMBOL_MAP.items()}
