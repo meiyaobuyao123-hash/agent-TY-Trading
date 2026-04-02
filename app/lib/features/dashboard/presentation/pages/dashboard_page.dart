@@ -27,6 +27,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
   bool _showOnboarding = false;
   bool _onboardingChecked = false;
   bool _showAllSignals = false;
+  bool _showDetailSections = false;
   static const int _initialSignalCount = 20;
 
   @override
@@ -214,32 +215,12 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
 
           const SizedBox(height: 20),
 
-          // AI Discoveries section (Smart Scanner)
-          _buildDiscoveriesSection(ref),
-
-          const SizedBox(height: 20),
-
-          // AI Evolution section
-          _buildEvolutionSection(ref),
-
-          const SizedBox(height: 20),
-
-          // Today's highlights
-          _buildHighlightsSection(ref),
-
-          const SizedBox(height: 12),
-
-          // AI Insights section
-          _buildInsightsSection(ref),
-
-          const SizedBox(height: 28),
-
-          // Section header: 实时 AI 信号
+          // Section header: 实时 AI 信号 (moved up for prominence)
           _buildSectionHeader(),
 
           const SizedBox(height: 16),
 
-          // Signal cards — sorted by confidence desc, then abs deviation desc
+          // Signal cards — the most important content, now prominent
           if (list.isEmpty)
             Padding(
               padding: const EdgeInsets.only(top: 60),
@@ -275,9 +256,78 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
           else
             ..._buildSortedSignalCards(context, ref, list),
 
+          const SizedBox(height: 20),
+
+          // Collapsible detail sections
+          _buildCollapsibleDetails(ref),
+
           const SizedBox(height: 24),
         ],
       ),
+    );
+  }
+
+  // ── Collapsible detail sections ──
+  Widget _buildCollapsibleDetails(WidgetRef ref) {
+    return Column(
+      children: [
+        GestureDetector(
+          onTap: () => setState(() => _showDetailSections = !_showDetailSections),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            decoration: BoxDecoration(
+              color: AppTheme.surfaceOf(context),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Row(
+              children: [
+                Icon(
+                  _showDetailSections
+                      ? Icons.expand_less_rounded
+                      : Icons.expand_more_rounded,
+                  size: 20,
+                  color: AppTheme.textSecondary,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  _showDetailSections ? '收起详情' : '展开 AI 进化 / 发现 / 洞察',
+                  style: const TextStyle(
+                    fontSize: 14,
+                    fontWeight: FontWeight.w500,
+                    color: AppTheme.textSecondary,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Text(
+                    '4个模块',
+                    style: TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.w500,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+        if (_showDetailSections) ...[
+          const SizedBox(height: 16),
+          _buildEvolutionSection(ref),
+          const SizedBox(height: 16),
+          _buildDiscoveriesSection(ref),
+          const SizedBox(height: 16),
+          _buildHighlightsSection(ref),
+          const SizedBox(height: 12),
+          _buildInsightsSection(ref),
+        ],
+      ],
     );
   }
 

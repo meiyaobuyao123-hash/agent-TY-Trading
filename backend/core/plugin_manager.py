@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import logging
 from typing import Optional
 
@@ -28,6 +29,9 @@ class PluginManager:
         self._reasoning: dict[str, ReasoningPlugin] = {}
         self._bias_detectors: dict[str, BiasDetectorPlugin] = {}
         self._evolution: dict[str, EvolutionPlugin] = {}
+        self._health_cache: dict[str, dict[str, bool]] | None = None
+        self._health_cache_ts: float = 0.0
+        self._HEALTH_CACHE_TTL = 60.0  # Cache health results for 60s
 
     # ── Registration ──────────────────────────────────────────────
 
@@ -110,7 +114,12 @@ class PluginManager:
                 logger.exception("Failed to initialize evolution: %s", name)
 
     async def health_check_all(self) -> dict[str, dict[str, bool]]:
-        """Run health checks on all plugins and return results."""
+        """Run health checks on all plugins and return results (parallel, 2s timeout, 60s cache)."""
+        import time
+        now = time.time()
+        if self._health_cache and (now - self._health_cache_ts) < self._HEALTH_CACHE_TTL:
+            return self._health_cache
+
         results: dict[str, dict[str, bool]] = {
             "data_sources": {},
             "reasoning": {},
@@ -118,30 +127,33 @@ class PluginManager:
             "evolution": {},
         }
 
-        for name, plugin in self._data_sources.items():
+        # Run data source health checks in parallel with timeout
+        async def _check_ds(name: str, plugin: DataSourcePlugin) -> tuple[str, bool]:
             try:
-                results["data_sources"][name] = await plugin.health_check()
-            except Exception:
-                results["data_sources"][name] = False
+                ok = await asyncio.wait_for(plugin.health_check(), timeout=2.0)
+                return name, ok
+            except (asyncio.TimeoutError, Exception):
+                return name, False
 
-        for name, plugin in self._reasoning.items():
-            try:
-                results["reasoning"][name] = True  # reasoning plugins don't have health_check
-            except Exception:
-                results["reasoning"][name] = False
+        ds_checks = await asyncio.gather(
+            *[_check_ds(n, p) for n, p in self._data_sources.items()],
+            return_exceptions=True,
+        )
+        for item in ds_checks:
+            if isinstance(item, tuple):
+                results["data_sources"][item[0]] = item[1]
 
-        for name, plugin in self._bias_detectors.items():
-            try:
-                results["bias_detectors"][name] = True
-            except Exception:
-                results["bias_detectors"][name] = False
+        for name in self._reasoning:
+            results["reasoning"][name] = True
 
-        for name, plugin in self._evolution.items():
-            try:
-                results["evolution"][name] = True
-            except Exception:
-                results["evolution"][name] = False
+        for name in self._bias_detectors:
+            results["bias_detectors"][name] = True
 
+        for name in self._evolution:
+            results["evolution"][name] = True
+
+        self._health_cache = results
+        self._health_cache_ts = now
         return results
 
     async def destroy_all(self) -> None:
