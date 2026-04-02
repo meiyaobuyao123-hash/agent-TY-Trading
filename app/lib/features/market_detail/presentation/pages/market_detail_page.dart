@@ -872,9 +872,11 @@ class MarketDetailPage extends ConsumerWidget {
         ...List.generate(judgments.length, (i) {
           final j = judgments[i];
           final isLast = i == judgments.length - 1;
+          final isFirst = i == 0;
           return _TimelineItem(
             judgment: j,
             isLast: isLast,
+            isLatest: isFirst,
             onTapReasoning: () => _showFullReasoningSheet(context, j),
           );
         }),
@@ -1090,27 +1092,94 @@ class _PriceChart extends StatelessWidget {
 }
 
 /// Timeline-style judgment history item with colored dot + connecting line.
-class _TimelineItem extends StatelessWidget {
+class _TimelineItem extends StatefulWidget {
   final Judgment judgment;
   final bool isLast;
+  final bool isLatest;
   final VoidCallback? onTapReasoning;
 
   const _TimelineItem({
     required this.judgment,
     required this.isLast,
+    this.isLatest = false,
     this.onTapReasoning,
   });
 
   @override
+  State<_TimelineItem> createState() => _TimelineItemState();
+}
+
+class _TimelineItemState extends State<_TimelineItem>
+    with SingleTickerProviderStateMixin {
+  AnimationController? _pulseController;
+  Animation<double>? _pulseAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.isLatest) {
+      _pulseController = AnimationController(
+        vsync: this,
+        duration: const Duration(milliseconds: 1500),
+      )..repeat(reverse: true);
+      _pulseAnimation = Tween<double>(begin: 1.0, end: 1.5).animate(
+        CurvedAnimation(parent: _pulseController!, curve: Curves.easeInOut),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    _pulseController?.dispose();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
     final timeFormat = DateFormat('MM-dd HH:mm');
-    final isUp = judgment.direction.toLowerCase() == 'up';
-    final isDown = judgment.direction.toLowerCase() == 'down';
+    final isUp = widget.judgment.direction.toLowerCase() == 'up';
+    final isDown = widget.judgment.direction.toLowerCase() == 'down';
     final dotColor = isUp
         ? AppTheme.upGreen
         : isDown
             ? AppTheme.downRed
             : AppTheme.flatGray;
+
+    Widget dotWidget = Container(
+      width: 10,
+      height: 10,
+      decoration: BoxDecoration(
+        color: dotColor,
+        shape: BoxShape.circle,
+      ),
+    );
+
+    // Pulse animation for the latest dot
+    if (widget.isLatest && _pulseAnimation != null) {
+      dotWidget = AnimatedBuilder(
+        animation: _pulseAnimation!,
+        builder: (context, child) {
+          return Transform.scale(
+            scale: _pulseAnimation!.value,
+            child: Container(
+              width: 10,
+              height: 10,
+              decoration: BoxDecoration(
+                color: dotColor,
+                shape: BoxShape.circle,
+                boxShadow: [
+                  BoxShadow(
+                    color: dotColor.withValues(alpha: 0.4),
+                    blurRadius: 6 * (_pulseAnimation!.value - 1.0) * 2,
+                    spreadRadius: 2 * (_pulseAnimation!.value - 1.0) * 2,
+                  ),
+                ],
+              ),
+            ),
+          );
+        },
+      );
+    }
 
     return IntrinsicHeight(
       child: Row(
@@ -1122,17 +1191,9 @@ class _TimelineItem extends StatelessWidget {
             child: Column(
               children: [
                 const SizedBox(height: 6),
-                // Colored dot
-                Container(
-                  width: 10,
-                  height: 10,
-                  decoration: BoxDecoration(
-                    color: dotColor,
-                    shape: BoxShape.circle,
-                  ),
-                ),
+                dotWidget,
                 // Connecting line
-                if (!isLast)
+                if (!widget.isLast)
                   Expanded(
                     child: Container(
                       width: 1.5,
@@ -1146,28 +1207,28 @@ class _TimelineItem extends StatelessWidget {
           // ── Middle: direction + confidence ──
           Expanded(
             child: Padding(
-              padding: EdgeInsets.only(bottom: isLast ? 0 : 20),
+              padding: EdgeInsets.only(bottom: widget.isLast ? 0 : 20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Row(
                     children: [
-                      DirectionBadge(direction: judgment.direction, size: 24),
+                      DirectionBadge(direction: widget.judgment.direction, size: 24),
                       const SizedBox(width: 10),
                       Expanded(
                         child: ConfidenceBar(
-                          confidence: judgment.confidenceScore,
+                          confidence: widget.judgment.confidenceScore,
                           height: 3,
                         ),
                       ),
                     ],
                   ),
-                  if (judgment.reasoning != null) ...[
+                  if (widget.judgment.reasoning != null) ...[
                     const SizedBox(height: 6),
                     GestureDetector(
-                      onTap: onTapReasoning,
+                      onTap: widget.onTapReasoning,
                       child: Text(
-                        judgment.reasoning!,
+                        widget.judgment.reasoning!,
                         maxLines: 2,
                         overflow: TextOverflow.ellipsis,
                         style: const TextStyle(
@@ -1177,9 +1238,9 @@ class _TimelineItem extends StatelessWidget {
                         ),
                       ),
                     ),
-                    if (judgment.reasoning!.length > 80)
+                    if (widget.judgment.reasoning!.length > 80)
                       GestureDetector(
-                        onTap: onTapReasoning,
+                        onTap: widget.onTapReasoning,
                         child: const Padding(
                           padding: EdgeInsets.only(top: 4),
                           child: Text(
@@ -1207,7 +1268,7 @@ class _TimelineItem extends StatelessWidget {
                 _settlementIcon(),
                 const SizedBox(height: 4),
                 Text(
-                  timeFormat.format(judgment.createdAt.toLocal()),
+                  timeFormat.format(widget.judgment.createdAt.toLocal()),
                   style: const TextStyle(
                     color: AppTheme.flatGray,
                     fontSize: 11,
@@ -1223,7 +1284,7 @@ class _TimelineItem extends StatelessWidget {
   }
 
   Widget _settlementIcon() {
-    if (!judgment.isSettled) {
+    if (!widget.judgment.isSettled) {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
         decoration: BoxDecoration(
@@ -1240,7 +1301,7 @@ class _TimelineItem extends StatelessWidget {
         ),
       );
     }
-    if (judgment.isCorrect == true) {
+    if (widget.judgment.isCorrect == true) {
       return Row(
         mainAxisSize: MainAxisSize.min,
         children: [

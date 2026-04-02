@@ -48,6 +48,34 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
 
   String? _selectedFilter;
   String _searchQuery = '';
+  final List<Market> _compareSelection = [];
+
+  void _toggleCompare(Market market, List<Market> allMarkets) {
+    setState(() {
+      if (_compareSelection.contains(market)) {
+        _compareSelection.remove(market);
+      } else if (_compareSelection.length < 2) {
+        _compareSelection.add(market);
+        if (_compareSelection.length == 2) {
+          _showComparisonSheet(context, _compareSelection[0], _compareSelection[1]);
+        }
+      }
+    });
+  }
+
+  void _clearCompare() {
+    setState(() => _compareSelection.clear());
+  }
+
+  void _showComparisonSheet(
+      BuildContext context, Market a, Market b) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => _ComparisonSheet(marketA: a, marketB: b),
+    ).then((_) => _clearCompare());
+  }
 
   String _localizedType(String type) {
     return _typeLabels[type.toLowerCase()] ?? type;
@@ -221,6 +249,47 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
             ),
           ),
 
+          // Compare hint bar
+          if (_compareSelection.length == 1)
+            SliverToBoxAdapter(
+              child: Padding(
+                padding: const EdgeInsets.fromLTRB(24, 8, 24, 0),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                      horizontal: 14, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                      color: AppTheme.primary.withValues(alpha: 0.2),
+                    ),
+                  ),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.compare_arrows_rounded,
+                          size: 16, color: AppTheme.primary),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '已选 ${_compareSelection[0].symbol}，长按另一个市场进行对比',
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: AppTheme.primary,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ),
+                      GestureDetector(
+                        onTap: _clearCompare,
+                        child: const Icon(Icons.close_rounded,
+                            size: 18, color: AppTheme.primary),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+
           // Empty state
           if (filtered.isEmpty)
             const SliverFillRemaining(
@@ -275,13 +344,16 @@ class _MarketsPageState extends ConsumerState<MarketsPage> {
                     children: items.asMap().entries.map((e) {
                       final isLast = e.key == items.length - 1;
                       final isFav = favorites.contains(e.value.symbol);
+                      final isSelected = _compareSelection.contains(e.value);
                       return _MarketRow(
                         market: e.value,
                         showDivider: !isLast,
                         isFavorite: isFav,
+                        isCompareSelected: isSelected,
                         onToggleFavorite: () {
                           ref.read(favoritesProvider.notifier).toggle(e.value.symbol);
                         },
+                        onLongPress: () => _toggleCompare(e.value, filtered),
                       );
                     }).toList(),
                   ),
@@ -311,13 +383,17 @@ class _MarketRow extends StatelessWidget {
   final Market market;
   final bool showDivider;
   final bool isFavorite;
+  final bool isCompareSelected;
   final VoidCallback? onToggleFavorite;
+  final VoidCallback? onLongPress;
 
   const _MarketRow({
     required this.market,
     this.showDivider = true,
     this.isFavorite = false,
+    this.isCompareSelected = false,
     this.onToggleFavorite,
+    this.onLongPress,
   });
 
   @override
@@ -349,7 +425,11 @@ class _MarketRow extends StatelessWidget {
         GestureDetector(
           behavior: HitTestBehavior.opaque,
           onTap: () => context.push('/market/${market.symbol}'),
-          child: Padding(
+          onLongPress: onLongPress,
+          child: Container(
+            color: isCompareSelected
+                ? AppTheme.primary.withValues(alpha: 0.06)
+                : null,
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
             child: Row(
               children: [
@@ -451,6 +531,195 @@ class _MarketRow extends StatelessWidget {
   }
 
   String _formatPrice(double price) {
+    if (price >= 1000) return price.toStringAsFixed(0);
+    if (price >= 1) return price.toStringAsFixed(2);
+    return price.toStringAsFixed(4);
+  }
+}
+
+/// Comparison bottom sheet — side-by-side view of two markets.
+class _ComparisonSheet extends StatelessWidget {
+  final Market marketA;
+  final Market marketB;
+
+  const _ComparisonSheet({required this.marketA, required this.marketB});
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      decoration: BoxDecoration(
+        color: AppTheme.cardColorOf(context),
+        borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 32),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // Handle bar
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: AppTheme.dividerOf(context),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 16),
+          // Title
+          Text(
+            '市场对比',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimaryOf(context),
+              letterSpacing: -0.3,
+            ),
+          ),
+          const SizedBox(height: 20),
+          // Two columns
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(child: _buildColumn(context, marketA)),
+              Container(
+                width: 1,
+                height: 180,
+                color: AppTheme.dividerOf(context),
+              ),
+              Expanded(child: _buildColumn(context, marketB)),
+            ],
+          ),
+          const SizedBox(height: 16),
+          // Correlation text
+          _buildCorrelationText(context),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildColumn(BuildContext context, Market market) {
+    final snap = market.latestSnapshot;
+    final price = snap?.price;
+    final changePct = snap?.changePct;
+    final changeColor = changePct != null
+        ? (changePct > 0
+            ? AppTheme.upGreen
+            : changePct < 0
+                ? AppTheme.downRed
+                : AppTheme.flatGray)
+        : AppTheme.flatGray;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 12),
+      child: Column(
+        children: [
+          Text(
+            market.symbol,
+            style: TextStyle(
+              fontSize: 17,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimaryOf(context),
+              letterSpacing: -0.2,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            market.name,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+            ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 12),
+          // Price
+          Text(
+            price != null ? _fmtPrice(price) : '--',
+            style: TextStyle(
+              fontSize: 22,
+              fontWeight: FontWeight.w700,
+              color: AppTheme.textPrimaryOf(context),
+              fontFeatures: const [FontFeature.tabularFigures()],
+            ),
+          ),
+          const SizedBox(height: 6),
+          // Change pill
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: changeColor.withValues(alpha: 0.1),
+              borderRadius: BorderRadius.circular(6),
+            ),
+            child: Text(
+              changePct != null
+                  ? '${changePct >= 0 ? '+' : ''}${changePct.toStringAsFixed(2)}%'
+                  : '--',
+              style: TextStyle(
+                color: changeColor,
+                fontWeight: FontWeight.w600,
+                fontSize: 14,
+                fontFeatures: const [FontFeature.tabularFigures()],
+              ),
+            ),
+          ),
+          const SizedBox(height: 10),
+          // Market type
+          Text(
+            market.marketType,
+            style: const TextStyle(
+              fontSize: 12,
+              color: AppTheme.textSecondary,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildCorrelationText(BuildContext context) {
+    // Simple static correlation check
+    final symA = marketA.symbol;
+    final symB = marketB.symbol;
+
+    String? correlationNote;
+    if (symA == symB) {
+      correlationNote = '相同市场';
+    } else if (marketA.marketType == marketB.marketType) {
+      correlationNote = '同类市场 (${marketA.marketType})，通常走势相关';
+    }
+
+    if (correlationNote == null) return const SizedBox.shrink();
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+      decoration: BoxDecoration(
+        color: AppTheme.primary.withValues(alpha: 0.06),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Row(
+        children: [
+          const Icon(Icons.hub_rounded, size: 16, color: AppTheme.primary),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Text(
+              correlationNote,
+              style: const TextStyle(
+                fontSize: 13,
+                color: AppTheme.primary,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _fmtPrice(double price) {
     if (price >= 1000) return price.toStringAsFixed(0);
     if (price >= 1) return price.toStringAsFixed(2);
     return price.toStringAsFixed(4);

@@ -150,7 +150,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
                   SizedBox(width: 6),
                   Expanded(
                     child: Text(
-                      'AI每4小时分析全球179个市场，给出方向判断和合理价格估值',
+                      'AI每4小时分析全球185个市场，给出方向判断和合理价格估值',
                       style: TextStyle(
                         fontSize: 12,
                         color: AppTheme.textSecondary,
@@ -178,6 +178,11 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
 
           // Summary metric cards
           _buildMetricRow(activeMarkets, totalCount, upCount, downCount),
+
+          const SizedBox(height: 20),
+
+          // AI Discoveries section (Smart Scanner)
+          _buildDiscoveriesSection(ref),
 
           const SizedBox(height: 20),
 
@@ -358,6 +363,132 @@ class _DashboardPageState extends ConsumerState<DashboardPage> {
           ),
         ),
       ],
+    );
+  }
+
+  // ── AI Discoveries section ──
+  Widget _buildDiscoveriesSection(WidgetRef ref) {
+    final discoveriesAsync = ref.watch(discoveriesProvider);
+
+    return discoveriesAsync.when(
+      loading: () => const SizedBox.shrink(),
+      error: (_, _) => const SizedBox.shrink(),
+      data: (discoveries) {
+        if (discoveries.isEmpty) return const SizedBox.shrink();
+
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Icon(Icons.auto_awesome_rounded,
+                    size: 18, color: AppTheme.primary),
+                const SizedBox(width: 6),
+                Text(
+                  'AI 发现',
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w700,
+                    color: AppTheme.textPrimaryOf(context),
+                    letterSpacing: -0.3,
+                  ),
+                ),
+                const Spacer(),
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                  decoration: BoxDecoration(
+                    color: AppTheme.primary.withValues(alpha: 0.1),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: Text(
+                    '${discoveries.length}条',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.primary,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            ...discoveries.map((d) {
+              final type = d['type'] as String? ?? '';
+              final desc = d['description'] as String? ?? '';
+              final severity = d['severity'] as String? ?? 'low';
+
+              IconData icon;
+              Color iconColor;
+              switch (type) {
+                case 'divergence':
+                  icon = Icons.compare_arrows_rounded;
+                  iconColor = const Color(0xFFFF6B00);
+                  break;
+                case 'volume_spike':
+                  icon = Icons.trending_up_rounded;
+                  iconColor = const Color(0xFF5856D6);
+                  break;
+                case 'direction_change':
+                  icon = Icons.swap_vert_rounded;
+                  iconColor = AppTheme.downRed;
+                  break;
+                default:
+                  icon = Icons.lightbulb_outline_rounded;
+                  iconColor = AppTheme.primary;
+              }
+
+              final isSevere = severity == 'high';
+
+              return Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Container(
+                  padding: const EdgeInsets.all(14),
+                  decoration: BoxDecoration(
+                    color: isSevere
+                        ? iconColor.withValues(alpha: 0.06)
+                        : AppTheme.surfaceOf(context),
+                    borderRadius: BorderRadius.circular(12),
+                    border: isSevere
+                        ? Border.all(
+                            color: iconColor.withValues(alpha: 0.2),
+                            width: 1,
+                          )
+                        : null,
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: iconColor.withValues(alpha: 0.12),
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        child: Icon(icon, size: 18, color: iconColor),
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          desc,
+                          style: TextStyle(
+                            fontSize: 14,
+                            fontWeight:
+                                isSevere ? FontWeight.w600 : FontWeight.w400,
+                            color: AppTheme.textPrimaryOf(context),
+                            height: 1.4,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              );
+            }),
+          ],
+        );
+      },
     );
   }
 

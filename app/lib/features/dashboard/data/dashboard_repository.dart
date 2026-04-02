@@ -38,4 +38,11 @@ class DashboardRepository {
     final alerts = data['alerts'] as List<dynamic>? ?? [];
     return alerts.cast<Map<String, dynamic>>();
   }
+
+  /// Fetch AI discoveries (smart market scanner).
+  Future<List<Map<String, dynamic>>> fetchDiscoveries() async {
+    final response = await _dio.get('/stats/discoveries');
+    final data = response.data as List<dynamic>;
+    return data.cast<Map<String, dynamic>>();
+  }
 }

@@ -131,36 +131,72 @@ def _parse_json_response(text: str, model_name: str) -> Optional[dict]:
 
 
 async def _call_deepseek(prompt: str, system: str = "") -> Optional[dict]:
-    """Call DeepSeek API (OpenAI-compatible)."""
+    """Call DeepSeek API (OpenAI-compatible) with retry + exponential backoff."""
     if not settings.DEEPSEEK_API_KEY:
         logger.warning("DEEPSEEK_API_KEY not set — skipping DeepSeek")
         return None
-    try:
-        async with httpx.AsyncClient(timeout=60) as client:
-            messages = []
-            if system:
-                messages.append({"role": "system", "content": system})
-            messages.append({"role": "user", "content": prompt})
-            resp = await client.post(
-                "https://api.deepseek.com/v1/chat/completions",
-                headers={
-                    "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
-                    "Content-Type": "application/json",
-                },
-                json={
-                    "model": "deepseek-chat",
-                    "messages": messages,
-                    "max_tokens": 1024,
-                    "temperature": 0.3,
-                },
+
+    max_retries = 3
+    for attempt in range(max_retries):
+        try:
+            async with httpx.AsyncClient(timeout=60) as client:
+                messages = []
+                if system:
+                    messages.append({"role": "system", "content": system})
+                messages.append({"role": "user", "content": prompt})
+                resp = await client.post(
+                    "https://api.deepseek.com/v1/chat/completions",
+                    headers={
+                        "Authorization": f"Bearer {settings.DEEPSEEK_API_KEY}",
+                        "Content-Type": "application/json",
+                    },
+                    json={
+                        "model": "deepseek-chat",
+                        "messages": messages,
+                        "max_tokens": 1024,
+                        "temperature": 0.3,
+                    },
+                )
+
+                # Handle retryable HTTP errors
+                if resp.status_code in (429, 500, 502, 503):
+                    wait_sec = 2 ** attempt * 2  # 2s, 4s, 8s
+                    logger.warning(
+                        "DeepSeek API返回 %d，第%d/%d次重试，等待%ds...",
+                        resp.status_code, attempt + 1, max_retries, wait_sec,
+                    )
+                    if attempt < max_retries - 1:
+                        await asyncio.sleep(wait_sec)
+                        continue
+                    else:
+                        logger.error(
+                            "DeepSeek API %d次重试全部失败，跳过该市场判断",
+                            max_retries,
+                        )
+                        return None
+
+                resp.raise_for_status()
+                data = resp.json()
+                text = data["choices"][0]["message"]["content"]
+                return _parse_json_response(text, "deepseek")
+        except httpx.TimeoutException:
+            wait_sec = 2 ** attempt * 2
+            logger.warning(
+                "DeepSeek API超时，第%d/%d次重试，等待%ds...",
+                attempt + 1, max_retries, wait_sec,
             )
-            resp.raise_for_status()
-            data = resp.json()
-            text = data["choices"][0]["message"]["content"]
-            return _parse_json_response(text, "deepseek")
-    except Exception:
-        logger.exception("DeepSeek API call failed")
-        return None
+            if attempt < max_retries - 1:
+                await asyncio.sleep(wait_sec)
+                continue
+            logger.error("DeepSeek API %d次重试全部超时", max_retries)
+            return None
+        except Exception:
+            logger.exception("DeepSeek API call failed (attempt %d/%d)", attempt + 1, max_retries)
+            if attempt < max_retries - 1:
+                await asyncio.sleep(2 ** attempt * 2)
+                continue
+            return None
+    return None
 
 
 async def call_all_models(prompt: str, system: str = "") -> list[dict]:

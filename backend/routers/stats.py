@@ -762,3 +762,179 @@ async def get_genome_status(
             active_name = g.name
 
     return GenomeStatusResponse(genomes=items, active_genome=active_name)
+
+
+# ── AI Discoveries (Smart Market Scanner) ────────────────────────
+
+
+class DiscoveryItem(BaseModel):
+    type: str  # "divergence" | "volume_spike" | "direction_change"
+    description: str
+    severity: str  # "high" | "medium" | "low"
+
+
+@router.get("/discoveries", response_model=list[DiscoveryItem])
+async def get_discoveries(
+    session: AsyncSession = Depends(get_session),
+) -> list[DiscoveryItem]:
+    """AI发现 — surface interesting cross-market patterns.
+
+    1. Divergence detection: correlated pairs moving in opposite directions
+    2. Unusual volume: volume > 2x average
+    3. Consensus shift: AI changed direction from previous judgment
+    """
+    from backend.core.correlations import CORRELATIONS
+
+    discoveries: list[DiscoveryItem] = []
+
+    # ── Fetch latest snapshot per market with change_pct, volume ──
+    latest_snap_sub = (
+        select(
+            MarketSnapshot.market_id,
+            func.max(MarketSnapshot.captured_at).label("max_at"),
+        )
+        .group_by(MarketSnapshot.market_id)
+        .subquery()
+    )
+    snap_stmt = (
+        select(MarketSnapshot, Market.symbol)
+        .join(
+            latest_snap_sub,
+            and_(
+                MarketSnapshot.market_id == latest_snap_sub.c.market_id,
+                MarketSnapshot.captured_at == latest_snap_sub.c.max_at,
+            ),
+        )
+        .join(Market, Market.id == MarketSnapshot.market_id)
+        .where(Market.is_active == True)
+    )
+    snap_result = await session.execute(snap_stmt)
+    snap_rows = snap_result.all()
+
+    # Build lookup maps
+    symbol_change: dict[str, float] = {}
+    symbol_volume: dict[str, float] = {}
+    for snap, sym in snap_rows:
+        if snap.change_pct is not None:
+            symbol_change[sym] = snap.change_pct
+        if snap.volume is not None:
+            symbol_volume[sym] = snap.volume
+
+    # ── 1. Divergence detection ──
+    checked_pairs: set[tuple[str, str]] = set()
+    for sym_a, related_list in CORRELATIONS.items():
+        change_a = symbol_change.get(sym_a)
+        if change_a is None:
+            continue
+        for sym_b in related_list:
+            pair = tuple(sorted([sym_a, sym_b]))
+            if pair in checked_pairs:
+                continue
+            checked_pairs.add(pair)
+
+            change_b = symbol_change.get(sym_b)
+            if change_b is None:
+                continue
+
+            # Divergence: one up significantly, one down significantly
+            if (change_a > 1.0 and change_b < -1.0) or (change_a < -1.0 and change_b > 1.0):
+                up_sym = sym_a if change_a > change_b else sym_b
+                down_sym = sym_b if change_a > change_b else sym_a
+                up_change = max(change_a, change_b)
+                down_change = min(change_a, change_b)
+                severity = "high" if abs(up_change - down_change) > 4.0 else "medium"
+                discoveries.append(DiscoveryItem(
+                    type="divergence",
+                    description=(
+                        f"{up_sym}和{down_sym}出现罕见分歧："
+                        f"{up_sym}上涨{up_change:+.1f}%但{down_sym}下跌{down_change:.1f}%"
+                    ),
+                    severity=severity,
+                ))
+
+    # ── 2. Unusual volume ──
+    # Compare current volume to average volume (batch approach)
+    # Get markets with volume data
+    vol_markets_stmt = (
+        select(Market.id, Market.symbol)
+        .where(Market.is_active == True, Market.symbol.in_(list(symbol_volume.keys())))
+    )
+    vol_markets_result = await session.execute(vol_markets_stmt)
+    vol_markets = vol_markets_result.all()
+
+    for market_id, sym in vol_markets:
+        current_vol = symbol_volume.get(sym, 0)
+        if current_vol <= 0:
+            continue
+
+        # Average volume from last 10 snapshots (subquery for LIMIT)
+        recent_vols_sub = (
+            select(MarketSnapshot.volume)
+            .where(
+                MarketSnapshot.market_id == market_id,
+                MarketSnapshot.volume.isnot(None),
+                MarketSnapshot.volume > 0,
+            )
+            .order_by(desc(MarketSnapshot.captured_at))
+            .limit(10)
+            .subquery()
+        )
+        avg_vol_stmt = select(func.avg(recent_vols_sub.c.volume))
+        avg_result = await session.execute(avg_vol_stmt)
+        avg_vol = avg_result.scalar()
+
+        if avg_vol and avg_vol > 0 and current_vol > avg_vol * 2.0:
+            ratio = current_vol / avg_vol
+            severity = "high" if ratio > 3.0 else "medium"
+            discoveries.append(DiscoveryItem(
+                type="volume_spike",
+                description=f"{sym}成交量异常放大，超过平均{ratio:.1f}倍",
+                severity=severity,
+            ))
+
+    # ── 3. Consensus shift — direction changed from previous judgment ──
+    # Get latest 2 judgments per market to detect direction change
+    shift_stmt = (
+        select(Judgment, Market.symbol)
+        .join(Market, Market.id == Judgment.market_id)
+        .where(Market.is_active == True)
+        .order_by(Market.symbol, desc(Judgment.created_at))
+    )
+    shift_result = await session.execute(shift_stmt)
+    shift_rows = shift_result.all()
+
+    # Group by symbol, take first 2
+    symbol_judgments: dict[str, list] = {}
+    for j, sym in shift_rows:
+        symbol_judgments.setdefault(sym, [])
+        if len(symbol_judgments[sym]) < 2:
+            symbol_judgments[sym].append(j)
+
+    direction_cn = {"up": "看涨", "down": "看跌", "flat": "观望"}
+    for sym, jlist in symbol_judgments.items():
+        if len(jlist) < 2:
+            continue
+        curr_dir = jlist[0].direction.lower()
+        prev_dir = jlist[1].direction.lower()
+        # Only flag meaningful shifts (not flat->flat)
+        if curr_dir != prev_dir and not (curr_dir == "flat" and prev_dir == "flat"):
+            # Skip flat transitions (less interesting)
+            if curr_dir == "flat" or prev_dir == "flat":
+                severity = "low"
+            else:
+                severity = "high"  # e.g., up->down or down->up
+            discoveries.append(DiscoveryItem(
+                type="direction_change",
+                description=(
+                    f"{sym}从{direction_cn.get(prev_dir, prev_dir)}"
+                    f"转为{direction_cn.get(curr_dir, curr_dir)}，可能趋势反转"
+                ),
+                severity=severity,
+            ))
+
+    # Sort: high > medium > low, then by type priority
+    severity_order = {"high": 0, "medium": 1, "low": 2}
+    type_order = {"divergence": 0, "direction_change": 1, "volume_spike": 2}
+    discoveries.sort(key=lambda d: (severity_order.get(d.severity, 9), type_order.get(d.type, 9)))
+
+    return discoveries[:5]

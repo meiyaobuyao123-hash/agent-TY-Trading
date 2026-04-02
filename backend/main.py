@@ -106,6 +106,22 @@ async def lifespan(app: FastAPI):
                     logger.info("Genome evolution completed: mutated %s", result)
 
         register_jobs(scheduler, _judgment_cycle, _settlement, _accuracy, _genome_evolution)
+
+        # Staleness monitor: check every 30 minutes if judgment cycle is stale
+        from backend.core.scheduler import check_cycle_staleness
+
+        async def _check_staleness():
+            await check_cycle_staleness(app)
+
+        scheduler.add_job(
+            _check_staleness,
+            "interval",
+            minutes=30,
+            id="cycle_staleness_check",
+            name="Cycle Staleness Monitor",
+            replace_existing=True,
+        )
+
         scheduler.start()
         app.state.scheduler = scheduler
         logger.info("Scheduler started with %d jobs", len(scheduler.get_jobs()))

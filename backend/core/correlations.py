@@ -58,6 +58,14 @@ CORRELATIONS: dict[str, list[str]] = {
     "CRV-USD": ["BTC-USD", "ETH-USD"],
     "ALGO-USD": ["BTC-USD", "ETH-USD"],
     "HBAR-USD": ["BTC-USD", "ETH-USD"],
+    # Round 16 — meme coins & DeFi
+    "FLOKI-USD": ["BTC-USD", "SHIB-USD", "DOGE-USD", "PEPE-USD"],
+    "MEME-USD": ["BTC-USD", "SHIB-USD", "PEPE-USD"],
+    "CAKE-USD": ["BTC-USD", "ETH-USD", "SUSHI-USD"],
+    "SUSHI-USD": ["BTC-USD", "ETH-USD", "UNI-USD", "CAKE-USD"],
+    "1INCH-USD": ["BTC-USD", "ETH-USD", "UNI-USD"],
+    "BAL-USD": ["BTC-USD", "ETH-USD", "UNI-USD"],
+    "YFI-USD": ["BTC-USD", "ETH-USD", "AAVE-USD"],
     # New US stocks (Round 9) — sector peers
     "SHOP": ["AMZN", "SPX"],
     "SNOW": ["CRM", "PLTR", "SPX"],

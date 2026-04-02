@@ -54,6 +54,10 @@ async def _fetch_crypto_mcap_rankings() -> dict[str, dict]:
         "near": "NEAR-USD", "filecoin": "FIL-USD", "tron": "TRX-USD",
         "the-open-network": "TON-USD", "shiba-inu": "SHIB-USD",
         "pepe": "PEPE-USD", "aave": "AAVE-USD",
+        "floki": "FLOKI-USD", "pancakeswap-token": "CAKE-USD",
+        "sushi": "SUSHI-USD", "1inch": "1INCH-USD",
+        "balancer": "BAL-USD", "yearn-finance": "YFI-USD",
+        "memecoin-2": "MEME-USD",
     }
 
     try:

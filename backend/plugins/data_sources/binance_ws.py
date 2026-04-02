@@ -64,6 +64,14 @@ SYMBOL_MAP = {
     "CRV-USD": "CRVUSDT",
     "ALGO-USD": "ALGOUSDT",
     "HBAR-USD": "HBARUSDT",
+    # Round 16 — meme coins & DeFi
+    "FLOKI-USD": "FLOKIUSDT",
+    "CAKE-USD": "CAKEUSDT",
+    "SUSHI-USD": "SUSHIUSDT",
+    "1INCH-USD": "1INCHUSDT",
+    "YFI-USD": "YFIUSDT",
+    "BAL-USD": "BALUSDT",
+    "MEME-USD": "MEMEUSDT",
 }
 
 REVERSE_MAP = {v: k for k, v in SYMBOL_MAP.items()}

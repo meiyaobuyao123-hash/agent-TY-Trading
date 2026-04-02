@@ -34,3 +34,10 @@ final alertsProvider =
   final repo = ref.watch(dashboardRepositoryProvider);
   return repo.fetchAlerts();
 });
+
+/// Provides AI discoveries (smart market scanner).
+final discoveriesProvider =
+    FutureProvider<List<Map<String, dynamic>>>((ref) async {
+  final repo = ref.watch(dashboardRepositoryProvider);
+  return repo.fetchDiscoveries();
+});
