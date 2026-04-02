@@ -653,8 +653,71 @@ async def _process_single_market(
         except Exception:
             logger.debug("Failed bias detection for %s", market.symbol)
 
+        # 5b2. Active bias intervention (L3) — ADJUST confidence, not just flag
+        intervention_log = []
+        intervened_confidence = ai_result.get("confidence_score", 0.3)
+
+        if bias_flags:
+            for bf in bias_flags:
+                old_conf = intervened_confidence
+
+                if bf["type"] == "anchoring" and intervened_confidence > 0.3:
+                    # Anchoring: rational_price within 0.5% of market AND confidence > 0.3
+                    if rational_price and market_price:
+                        dev = abs((rational_price - market_price) / market_price)
+                        if dev < 0.005:
+                            intervened_confidence *= 0.70  # reduce by 30%
+                            bf["intervention"] = f"置信度从{old_conf:.0%}调降至{intervened_confidence:.0%}"
+                            intervention_log.append(
+                                f"偏差干预: {market.symbol} anchoring "
+                                f"置信度 {old_conf:.3f} -> {intervened_confidence:.3f}"
+                            )
+
+                elif bf["type"] == "momentum" and intervened_confidence > 0.5:
+                    # Momentum: AI predicts continuation of >3% 24h move with confidence > 0.5
+                    change = tick_data.get("change_pct")
+                    if change is not None and abs(change) > 3.0:
+                        intervened_confidence *= 0.80  # reduce by 20%
+                        bf["intervention"] = f"置信度从{old_conf:.0%}调降至{intervened_confidence:.0%}"
+                        intervention_log.append(
+                            f"偏差干预: {market.symbol} momentum "
+                            f"置信度 {old_conf:.3f} -> {intervened_confidence:.3f}"
+                        )
+
+                elif bf["type"] == "consensus":
+                    # Consensus: 3+ consecutive same-direction => reduce by 15%
+                    intervened_confidence *= 0.85
+                    if "contrarian_warning" not in [f["type"] for f in bias_flags]:
+                        bias_flags.append({
+                            "type": "contrarian_warning",
+                            "label": "逆向提醒",
+                            "detail": "连续同方向判断，系统已自动降低置信度作为风控措施",
+                            "severity": "medium",
+                        })
+                    bf["intervention"] = f"置信度从{old_conf:.0%}调降至{intervened_confidence:.0%}"
+                    intervention_log.append(
+                        f"偏差干预: {market.symbol} consensus "
+                        f"置信度 {old_conf:.3f} -> {intervened_confidence:.3f}"
+                    )
+
+            for log_msg in intervention_log:
+                logger.info(log_msg)
+
+        # 5b3. Deviation significance scoring (L3)
+        deviation_significance = None
+        if deviation_pct is not None and tech_indicators:
+            vol_7d = tech_indicators.get("volatility_7d")
+            if vol_7d and vol_7d > 0:
+                deviation_significance = round(abs(deviation_pct) / vol_7d, 3)
+                if deviation_significance > 2.0:
+                    logger.info(
+                        "显著偏差: %s deviation_significance=%.2f (偏差%.2f%% / 波动率%.2f%%)",
+                        market.symbol, deviation_significance,
+                        abs(deviation_pct), vol_7d,
+                    )
+
         # 5c. Confidence calibration based on historical accuracy
-        raw_confidence = ai_result.get("confidence_score", 0.3)
+        raw_confidence = intervened_confidence
         calibrated_confidence = raw_confidence
         try:
             acc_stmt = (
@@ -699,6 +762,7 @@ async def _process_single_market(
             confidence_score=round(calibrated_confidence, 3),
             rational_price=rational_price,
             deviation_pct=deviation_pct,
+            deviation_significance=deviation_significance,
             quality_score=quality_score,
             reasoning=ai_result.get("reasoning"),
             model_votes=ai_result.get("model_votes"),

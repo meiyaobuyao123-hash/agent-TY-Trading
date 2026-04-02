@@ -131,6 +131,30 @@ class JudgmentCard extends StatelessWidget {
                             ),
                           ),
                         ],
+                        // L3: Show bias intervention badge
+                        if (_hasIntervention()) ...[
+                          const SizedBox(width: 6),
+                          GestureDetector(
+                            onTap: () => _showInterventionDetail(context),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 5, vertical: 1),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF2196F3)
+                                    .withValues(alpha: 0.12),
+                                borderRadius: BorderRadius.circular(4),
+                              ),
+                              child: const Text(
+                                '\u26A1 AI已校准',
+                                style: TextStyle(
+                                  fontSize: 9,
+                                  color: Color(0xFF2196F3),
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ],
                         if (isLow) ...[
                           const SizedBox(width: 6),
                           Container(
@@ -196,6 +220,116 @@ class JudgmentCard extends StatelessWidget {
               ),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// Check if any bias flag has an active intervention.
+  bool _hasIntervention() {
+    if (judgment.biasFlags == null) return false;
+    return judgment.biasFlags!.any((f) => f.hasIntervention);
+  }
+
+  /// Show bottom sheet with intervention details.
+  void _showInterventionDetail(BuildContext context) {
+    final interventions = judgment.biasFlags
+            ?.where((f) => f.hasIntervention)
+            .toList() ??
+        [];
+    if (interventions.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundOf(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              '\u26A1 AI偏差校准',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF2196F3),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '系统检测到认知偏差并已自动调整置信度，使预测更加客观。',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...interventions.map((f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2196F3).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: const Border(
+                        left: BorderSide(
+                          color: Color(0xFF2196F3),
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          f.label,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          f.intervention!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF2196F3),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          f.detail,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+          ],
         ),
       ),
     );

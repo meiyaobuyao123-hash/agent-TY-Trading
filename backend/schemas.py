@@ -69,6 +69,7 @@ class JudgmentOut(BaseModel):
     confidence_score: float
     rational_price: Optional[float] = None
     deviation_pct: Optional[float] = None
+    deviation_significance: Optional[float] = None
     reasoning: Optional[str] = None
     model_votes: Optional[list[dict]] = None
     quality_score: Optional[float] = None

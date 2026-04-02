@@ -1750,6 +1750,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
       upProbability: j.upProbability,
       downProbability: j.downProbability,
       flatProbability: j.flatProbability,
+      biasFlags: j.biasFlags,
       isFavorite: isFavorite,
       onToggleFavorite: onToggleFavorite,
       onTap: () {

@@ -29,6 +29,7 @@ def _judgment_to_out(j: Judgment, symbol: Optional[str] = None) -> JudgmentOut:
         confidence_score=j.confidence_score,
         rational_price=j.rational_price,
         deviation_pct=j.deviation_pct,
+        deviation_significance=j.deviation_significance if hasattr(j, "deviation_significance") else None,
         reasoning=j.reasoning,
         model_votes=j.model_votes,
         quality_score=j.quality_score if hasattr(j, "quality_score") else None,

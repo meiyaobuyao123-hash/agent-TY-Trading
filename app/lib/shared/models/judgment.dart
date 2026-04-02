@@ -52,12 +52,14 @@ class BiasFlag {
   final String label;
   final String detail;
   final String severity;
+  final String? intervention;
 
   const BiasFlag({
     required this.type,
     required this.label,
     required this.detail,
     required this.severity,
+    this.intervention,
   });
 
   factory BiasFlag.fromJson(Map<String, dynamic> json) {
@@ -66,8 +68,12 @@ class BiasFlag {
       label: json['label'] as String? ?? '',
       detail: json['detail'] as String? ?? '',
       severity: json['severity'] as String? ?? 'low',
+      intervention: json['intervention'] as String?,
     );
   }
+
+  /// Whether an active bias intervention was applied (confidence adjusted).
+  bool get hasIntervention => intervention != null && intervention!.isNotEmpty;
 }
 
 /// An AI judgment record.
@@ -80,6 +86,7 @@ class Judgment {
   final double confidenceScore;
   final double? rationalPrice;
   final double? deviationPct;
+  final double? deviationSignificance;
   final String? reasoning;
   final List<ModelVote>? modelVotes;
   final double? qualityScore;
@@ -104,6 +111,7 @@ class Judgment {
     required this.confidenceScore,
     this.rationalPrice,
     this.deviationPct,
+    this.deviationSignificance,
     this.reasoning,
     this.modelVotes,
     this.qualityScore,
@@ -149,6 +157,7 @@ class Judgment {
       confidenceScore: (json['confidence_score'] as num).toDouble(),
       rationalPrice: (json['rational_price'] as num?)?.toDouble(),
       deviationPct: (json['deviation_pct'] as num?)?.toDouble(),
+      deviationSignificance: (json['deviation_significance'] as num?)?.toDouble(),
       reasoning: json['reasoning'] as String?,
       modelVotes: votes,
       qualityScore: (json['quality_score'] as num?)?.toDouble(),

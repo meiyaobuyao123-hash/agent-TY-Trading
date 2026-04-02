@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import 'package:share_plus/share_plus.dart';
 import '../../core/theme/app_theme.dart';
+import '../models/judgment.dart';
 import 'signal_strength.dart';
 
 /// Market signal card for the dashboard — direction + reasoning as hero content.
@@ -23,6 +24,7 @@ class SignalCard extends StatelessWidget {
   final double? upProbability;
   final double? downProbability;
   final double? flatProbability;
+  final List<BiasFlag>? biasFlags;
   final bool isFavorite;
   final VoidCallback? onTap;
   final VoidCallback? onToggleFavorite;
@@ -45,6 +47,7 @@ class SignalCard extends StatelessWidget {
     this.upProbability,
     this.downProbability,
     this.flatProbability,
+    this.biasFlags,
     this.isFavorite = false,
     this.onTap,
     this.onToggleFavorite,
@@ -118,6 +121,18 @@ class SignalCard extends StatelessWidget {
       'ASML.NL': 'ASML 阿斯麦',
       'MC.PA': 'LVMH 路威酩轩',
       'TTE.PA': '道达尔能源',
+      // A股国企
+      '601668': '中国建筑',
+      '601988': '中国银行',
+      '601288': '农业银行',
+      '601328': '交通银行',
+      '601658': '邮储银行',
+      '601628': '中国人寿',
+      '601857': '中国石油',
+      '600028': '中国石化',
+      // 大宗商品
+      'CC=F': '可可期货',
+      'SB=F': '白糖期货',
     };
     return nameMap[symbol] ?? symbol;
   }
@@ -197,6 +212,31 @@ class SignalCard extends StatelessWidget {
                               color: AppTheme.upGreen,
                               fontSize: 9,
                               fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ),
+                      ],
+                      // L3: AI calibration badge
+                      if (_hasIntervention()) ...[
+                        const SizedBox(width: 6),
+                        GestureDetector(
+                          onTap: () => _showInterventionDetail(context),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 5,
+                              vertical: 1,
+                            ),
+                            decoration: BoxDecoration(
+                              color: const Color(0xFF2196F3).withValues(alpha: 0.12),
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: const Text(
+                              '\u26A1 AI已校准',
+                              style: TextStyle(
+                                color: Color(0xFF2196F3),
+                                fontSize: 9,
+                                fontWeight: FontWeight.w600,
+                              ),
                             ),
                           ),
                         ),
@@ -535,6 +575,112 @@ class SignalCard extends StatelessWidget {
       return '当前偏高${val.abs().toStringAsFixed(1)}%';
     }
     return '价格接近合理水平';
+  }
+
+  bool _hasIntervention() {
+    if (biasFlags == null) return false;
+    return biasFlags!.any((f) => f.hasIntervention);
+  }
+
+  void _showInterventionDetail(BuildContext context) {
+    final interventions =
+        biasFlags?.where((f) => f.hasIntervention).toList() ?? [];
+    if (interventions.isEmpty) return;
+
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) => Container(
+        decoration: BoxDecoration(
+          color: AppTheme.backgroundOf(context),
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+        ),
+        padding: const EdgeInsets.fromLTRB(24, 12, 24, 40),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Center(
+              child: Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.divider,
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+            ),
+            const SizedBox(height: 20),
+            const Text(
+              '\u26A1 AI偏差校准',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+                color: Color(0xFF2196F3),
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              '系统检测到认知偏差并已自动调整置信度，使预测更加客观。',
+              style: TextStyle(
+                fontSize: 13,
+                color: AppTheme.textSecondary,
+                height: 1.4,
+              ),
+            ),
+            const SizedBox(height: 16),
+            ...interventions.map((f) => Padding(
+                  padding: const EdgeInsets.only(bottom: 12),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2196F3).withValues(alpha: 0.06),
+                      borderRadius: BorderRadius.circular(8),
+                      border: const Border(
+                        left: BorderSide(
+                          color: Color(0xFF2196F3),
+                          width: 3,
+                        ),
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          f.label,
+                          style: const TextStyle(
+                            fontSize: 14,
+                            fontWeight: FontWeight.w600,
+                            color: AppTheme.textPrimary,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          f.intervention!,
+                          style: const TextStyle(
+                            fontSize: 13,
+                            color: Color(0xFF2196F3),
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          f.detail,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            color: AppTheme.textSecondary,
+                            height: 1.3,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )),
+          ],
+        ),
+      ),
+    );
   }
 
   void _shareSignal() {

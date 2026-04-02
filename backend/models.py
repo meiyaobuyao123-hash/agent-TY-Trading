@@ -99,6 +99,7 @@ class Judgment(Base):
     confidence_score = Column(Float, nullable=False, default=0.5)
     rational_price = Column(Float, nullable=True)
     deviation_pct = Column(Float, nullable=True)
+    deviation_significance = Column(Float, nullable=True)  # L3: deviation / avg_volatility_7d
     reasoning = Column(Text, nullable=True)
     model_votes = Column(JSON, nullable=True)
     quality_score = Column(Float, nullable=True)
