@@ -114,6 +114,15 @@ async def lifespan(app: FastAPI):
                 if deleted > 0:
                     logger.info("快照清理完成: 删除了 %d 条旧记录", deleted)
 
+        async def _expire_judgments():
+            """标记已过期但未结算的判断为过期状态。"""
+            from backend.database import async_session_maker
+            async with async_session_maker() as session:
+                from backend.services.cleanup_service import expire_stale_judgments
+                expired = await expire_stale_judgments(session)
+                if expired > 0:
+                    logger.info("过期判断处理完成: 标记了 %d 条过期记录", expired)
+
         register_jobs(scheduler, _judgment_cycle, _settlement, _accuracy, _genome_evolution)
 
         # 每天凌晨3点清理旧快照
@@ -124,6 +133,16 @@ async def lifespan(app: FastAPI):
             minute=0,
             id="snapshot_cleanup",
             name="Old Snapshot Cleanup",
+            replace_existing=True,
+        )
+
+        # 每小时检查并标记过期判断
+        scheduler.add_job(
+            _expire_judgments,
+            "interval",
+            hours=1,
+            id="expire_judgments",
+            name="Judgment Expiry Cleanup",
             replace_existing=True,
         )
 

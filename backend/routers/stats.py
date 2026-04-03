@@ -2504,3 +2504,201 @@ async def get_confidence_history(
             created_at=row[2].isoformat(),
         ))
     return items
+
+
+# ── AI 周报 (Weekly Summary) ──────────────────────────────────────────
+
+
+class WeeklyAccuracyTrend(BaseModel):
+    trend: str  # improving / declining / stable
+    current_accuracy: float
+    previous_accuracy: float
+    change: float
+
+
+class WeeklyMarketTypePerformance(BaseModel):
+    market_type: str
+    accuracy_pct: float
+    total: int
+    correct: int
+
+
+class WeeklySummaryResponse(BaseModel):
+    week_start: str
+    week_end: str
+    total_judgments_this_week: int
+    settled_this_week: int
+    correct_this_week: int
+    accuracy_trend: WeeklyAccuracyTrend
+    best_market_types: list[WeeklyMarketTypePerformance]
+    worst_market_types: list[WeeklyMarketTypePerformance]
+    notable_discoveries: list[str]
+    genome_status: str
+    brier_score_this_week: Optional[float] = None
+
+
+@router.get("/weekly-summary", response_model=WeeklySummaryResponse)
+async def get_weekly_summary(
+    session: AsyncSession = Depends(get_session),
+) -> WeeklySummaryResponse:
+    """AI 周报 — 聚合过去7天的系统表现。"""
+    now = datetime.utcnow()
+    week_ago = now - timedelta(days=7)
+    two_weeks_ago = now - timedelta(days=14)
+
+    # This week's judgments
+    this_week_count_result = await session.execute(
+        select(func.count()).select_from(Judgment).where(Judgment.created_at >= week_ago)
+    )
+    total_judgments_this_week = this_week_count_result.scalar() or 0
+
+    # This week's settlements
+    this_week_settled_result = await session.execute(
+        select(func.count()).select_from(Settlement)
+        .join(Judgment, Judgment.id == Settlement.judgment_id)
+        .where(Judgment.created_at >= week_ago, Settlement.is_correct.isnot(None))
+    )
+    settled_this_week = this_week_settled_result.scalar() or 0
+
+    this_week_correct_result = await session.execute(
+        select(func.count()).select_from(Settlement)
+        .join(Judgment, Judgment.id == Settlement.judgment_id)
+        .where(Judgment.created_at >= week_ago, Settlement.is_correct == True)
+    )
+    correct_this_week = this_week_correct_result.scalar() or 0
+
+    current_accuracy = round(correct_this_week / settled_this_week * 100, 1) if settled_this_week > 0 else 0.0
+
+    # Previous week's accuracy for trend
+    prev_settled_result = await session.execute(
+        select(func.count()).select_from(Settlement)
+        .join(Judgment, Judgment.id == Settlement.judgment_id)
+        .where(
+            Judgment.created_at >= two_weeks_ago,
+            Judgment.created_at < week_ago,
+            Settlement.is_correct.isnot(None),
+        )
+    )
+    prev_settled = prev_settled_result.scalar() or 0
+
+    prev_correct_result = await session.execute(
+        select(func.count()).select_from(Settlement)
+        .join(Judgment, Judgment.id == Settlement.judgment_id)
+        .where(
+            Judgment.created_at >= two_weeks_ago,
+            Judgment.created_at < week_ago,
+            Settlement.is_correct == True,
+        )
+    )
+    prev_correct = prev_correct_result.scalar() or 0
+    previous_accuracy = round(prev_correct / prev_settled * 100, 1) if prev_settled > 0 else 0.0
+
+    change = round(current_accuracy - previous_accuracy, 1)
+    if change > 2:
+        trend_label = "improving"
+    elif change < -2:
+        trend_label = "declining"
+    else:
+        trend_label = "stable"
+
+    accuracy_trend = WeeklyAccuracyTrend(
+        trend=trend_label,
+        current_accuracy=current_accuracy,
+        previous_accuracy=previous_accuracy,
+        change=change,
+    )
+
+    # Per-market-type accuracy this week
+    type_perf_stmt = (
+        select(
+            Market.market_type,
+            func.count(Settlement.id).label("total"),
+            func.sum(func.cast(Settlement.is_correct, Integer)).label("correct"),
+        )
+        .join(Judgment, Judgment.id == Settlement.judgment_id)
+        .join(Market, Market.id == Judgment.market_id)
+        .where(Judgment.created_at >= week_ago, Settlement.is_correct.isnot(None))
+        .group_by(Market.market_type)
+    )
+    type_perf_result = await session.execute(type_perf_stmt)
+    type_rows = type_perf_result.all()
+
+    type_performances = []
+    for mt, total, correct in type_rows:
+        correct_val = correct or 0
+        pct = round(correct_val / total * 100, 1) if total > 0 else 0.0
+        type_performances.append(WeeklyMarketTypePerformance(
+            market_type=mt,
+            accuracy_pct=pct,
+            total=total,
+            correct=correct_val,
+        ))
+
+    # Sort for best/worst
+    sorted_perf = sorted(type_performances, key=lambda x: x.accuracy_pct, reverse=True)
+    best_types = sorted_perf[:3] if sorted_perf else []
+    worst_types = sorted_perf[-3:] if len(sorted_perf) > 3 else sorted_perf
+
+    # Notable discoveries: high-deviation judgments this week
+    notable = []
+    high_dev_stmt = (
+        select(Market.symbol, Judgment.deviation_pct, Judgment.direction)
+        .join(Market, Market.id == Judgment.market_id)
+        .where(
+            Judgment.created_at >= week_ago,
+            Judgment.deviation_pct.isnot(None),
+            func.abs(Judgment.deviation_pct) > 5,
+        )
+        .order_by(func.abs(Judgment.deviation_pct).desc())
+        .limit(5)
+    )
+    high_dev_result = await session.execute(high_dev_stmt)
+    for symbol, dev_pct, direction in high_dev_result.all():
+        notable.append(f"{symbol} 偏离 {dev_pct:+.1f}%，AI判断方向{direction}")
+
+    if not notable:
+        notable.append("本周无显著偏离发现")
+
+    # Genome status
+    genome_status = "运行中"
+    try:
+        from backend.core.strategy_genome import StrategyGenome
+        genome_stmt = select(StrategyGenome).limit(1)
+        genome_result = await session.execute(genome_stmt)
+        genome = genome_result.scalar_one_or_none()
+        if genome:
+            genome_status = f"代数 {genome.generation}，适应度 {genome.fitness:.3f}"
+    except Exception:
+        genome_status = "初始化中"
+
+    # Brier score this week
+    brier_this_week = None
+    try:
+        brier_stmt = (
+            select(Settlement.brier_score)
+            .join(Judgment, Judgment.id == Settlement.judgment_id)
+            .where(
+                Judgment.created_at >= week_ago,
+                Settlement.brier_score.isnot(None),
+            )
+        )
+        brier_result = await session.execute(brier_stmt)
+        brier_vals = [row[0] for row in brier_result.all()]
+        if brier_vals:
+            brier_this_week = round(sum(brier_vals) / len(brier_vals), 4)
+    except Exception:
+        pass
+
+    return WeeklySummaryResponse(
+        week_start=week_ago.strftime("%Y-%m-%d"),
+        week_end=now.strftime("%Y-%m-%d"),
+        total_judgments_this_week=total_judgments_this_week,
+        settled_this_week=settled_this_week,
+        correct_this_week=correct_this_week,
+        accuracy_trend=accuracy_trend,
+        best_market_types=best_types,
+        worst_market_types=worst_types,
+        notable_discoveries=notable,
+        genome_status=genome_status,
+        brier_score_this_week=brier_this_week,
+    )

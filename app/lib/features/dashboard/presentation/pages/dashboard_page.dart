@@ -4,6 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
+import 'package:share_plus/share_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../core/services/favorites_service.dart';
@@ -1362,6 +1363,165 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
     return '部分异常';
   }
 
+  void _showQuickActions(BuildContext context, WidgetRef ref) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.transparent,
+      builder: (ctx) {
+        return Container(
+          decoration: BoxDecoration(
+            color: AppTheme.surfaceOf(context),
+            borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          ),
+          padding: const EdgeInsets.fromLTRB(24, 12, 24, 32),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Container(
+                width: 36,
+                height: 4,
+                decoration: BoxDecoration(
+                  color: AppTheme.dividerOf(context),
+                  borderRadius: BorderRadius.circular(2),
+                ),
+              ),
+              const SizedBox(height: 20),
+              Text(
+                '快速操作',
+                style: TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  color: AppTheme.textPrimaryOf(context),
+                ),
+              ),
+              const SizedBox(height: 20),
+              _quickActionTile(
+                context,
+                icon: Icons.play_circle_outline_rounded,
+                color: AppTheme.primary,
+                title: '触发AI分析',
+                subtitle: '立即运行一轮全市场判断',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _triggerJudgmentCycle(context);
+                },
+              ),
+              const Divider(height: 1),
+              _quickActionTile(
+                context,
+                icon: Icons.article_outlined,
+                color: const Color(0xFF5856D6),
+                title: '查看日报',
+                subtitle: '查看今日 AI 分析报告',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  Navigator.of(context).push(
+                    MaterialPageRoute(
+                      builder: (_) => const _DailyReportPageWrapper(),
+                    ),
+                  );
+                },
+              ),
+              const Divider(height: 1),
+              _quickActionTile(
+                context,
+                icon: Icons.share_outlined,
+                color: const Color(0xFF34C759),
+                title: '分享系统状态',
+                subtitle: '分享当前 AI 表现摘要',
+                onTap: () {
+                  Navigator.pop(ctx);
+                  _shareSystemStatus(ref);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _quickActionTile(
+    BuildContext context, {
+    required IconData icon,
+    required Color color,
+    required String title,
+    required String subtitle,
+    required VoidCallback onTap,
+  }) {
+    return ListTile(
+      contentPadding: const EdgeInsets.symmetric(horizontal: 4, vertical: 4),
+      leading: Container(
+        width: 40,
+        height: 40,
+        decoration: BoxDecoration(
+          color: color.withValues(alpha: 0.12),
+          borderRadius: BorderRadius.circular(10),
+        ),
+        child: Icon(icon, color: color, size: 22),
+      ),
+      title: Text(
+        title,
+        style: TextStyle(
+          fontSize: 16,
+          fontWeight: FontWeight.w600,
+          color: AppTheme.textPrimaryOf(context),
+        ),
+      ),
+      subtitle: Text(
+        subtitle,
+        style: const TextStyle(
+          fontSize: 13,
+          color: AppTheme.textSecondary,
+        ),
+      ),
+      trailing: Icon(
+        Icons.chevron_right_rounded,
+        color: AppTheme.dividerOf(context),
+      ),
+      onTap: onTap,
+    );
+  }
+
+  void _triggerJudgmentCycle(BuildContext context) {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('正在触发 AI 分析周期...'),
+        duration: Duration(seconds: 3),
+        behavior: SnackBarBehavior.floating,
+      ),
+    );
+  }
+
+  void _shareSystemStatus(WidgetRef ref) {
+    final stats = ref.read(overviewStatsProvider).valueOrNull;
+    if (stats == null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('数据加载中，请稍后再试'),
+          behavior: SnackBarBehavior.floating,
+        ),
+      );
+      return;
+    }
+
+    final totalJudgments = stats['total_judgments'] ?? 0;
+    final accuracy = stats['overall_accuracy'] ?? 0.0;
+    final marketsTracked = stats['markets_tracked'] ?? 0;
+    final daysRunning = stats['days_running'] ?? 0;
+    final brierScore = stats['brier_score'];
+
+    final text = '''天演 AI 金融世界模型
+运行天数: $daysRunning
+追踪市场: $marketsTracked
+总判断数: $totalJudgments
+准确率: ${(accuracy as num).toStringAsFixed(1)}%${brierScore != null ? '\nBrier分数: $brierScore' : ''}
+---
+Powered by Project TY''';
+
+    Share.share(text);
+  }
+
   Widget _buildHeader() {
     final now = DateTime.now();
     final timeStr = DateFormat('HH:mm').format(now);
@@ -1380,17 +1540,23 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
           children: [
             Row(
               children: [
-                Text(
-                  '天演',
-                  style: TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w600,
-                    color: AppTheme.textPrimaryOf(context),
-                    letterSpacing: -0.5,
+                GestureDetector(
+                  onLongPress: () {
+                    HapticFeedback.mediumImpact();
+                    _showQuickActions(context, ref);
+                  },
+                  child: Text(
+                    '天演',
+                    style: TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w600,
+                      color: AppTheme.textPrimaryOf(context),
+                      letterSpacing: -0.5,
+                    ),
                   ),
                 ),
                 const SizedBox(width: 8),
-                // System health dot
+                // System health dot (pulses when healthy)
                 GestureDetector(
                   onTap: () {
                     final label = _systemHealthLabel(healthColor);
@@ -1402,20 +1568,9 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
                       ),
                     );
                   },
-                  child: Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: healthColor,
-                      shape: BoxShape.circle,
-                      boxShadow: [
-                        BoxShadow(
-                          color: healthColor.withValues(alpha: 0.5),
-                          blurRadius: 6,
-                          spreadRadius: 1,
-                        ),
-                      ],
-                    ),
+                  child: _HealthPulsingDot(
+                    color: healthColor,
+                    isHealthy: healthColor == AppTheme.upGreen,
                   ),
                 ),
               ],
@@ -2141,6 +2296,7 @@ class _DashboardPageState extends ConsumerState<DashboardPage>
       createdAt: j.createdAt,
       isSettled: j.isSettled,
       isCorrect: j.isCorrect,
+      isExpired: j.isExpired,
       qualityScore: j.qualityScore,
       upProbability: j.upProbability,
       downProbability: j.downProbability,
@@ -2246,6 +2402,106 @@ class _PulsingDotState extends State<_PulsingDot>
           shape: BoxShape.circle,
         ),
       ),
+    );
+  }
+}
+
+/// Pulsing health indicator dot — gentle heartbeat when system is healthy.
+class _HealthPulsingDot extends StatefulWidget {
+  final Color color;
+  final bool isHealthy;
+
+  const _HealthPulsingDot({
+    required this.color,
+    required this.isHealthy,
+  });
+
+  @override
+  State<_HealthPulsingDot> createState() => _HealthPulsingDotState();
+}
+
+class _HealthPulsingDotState extends State<_HealthPulsingDot>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _controller;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _glowAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _controller = AnimationController(
+      duration: const Duration(milliseconds: 2000),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(begin: 1.0, end: 1.25).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    _glowAnimation = Tween<double>(begin: 0.3, end: 0.7).animate(
+      CurvedAnimation(parent: _controller, curve: Curves.easeInOut),
+    );
+    if (widget.isHealthy) {
+      _controller.repeat(reverse: true);
+    }
+  }
+
+  @override
+  void didUpdateWidget(covariant _HealthPulsingDot oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (widget.isHealthy && !_controller.isAnimating) {
+      _controller.repeat(reverse: true);
+    } else if (!widget.isHealthy && _controller.isAnimating) {
+      _controller.stop();
+      _controller.reset();
+    }
+  }
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (!widget.isHealthy) {
+      return Container(
+        width: 10,
+        height: 10,
+        decoration: BoxDecoration(
+          color: widget.color,
+          shape: BoxShape.circle,
+          boxShadow: [
+            BoxShadow(
+              color: widget.color.withValues(alpha: 0.5),
+              blurRadius: 6,
+              spreadRadius: 1,
+            ),
+          ],
+        ),
+      );
+    }
+    return AnimatedBuilder(
+      animation: _controller,
+      builder: (context, child) {
+        return Transform.scale(
+          scale: _scaleAnimation.value,
+          child: Container(
+            width: 10,
+            height: 10,
+            decoration: BoxDecoration(
+              color: widget.color,
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: widget.color.withValues(alpha: _glowAnimation.value),
+                  blurRadius: 8,
+                  spreadRadius: 2,
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 }

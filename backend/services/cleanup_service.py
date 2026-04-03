@@ -66,3 +66,50 @@ async def cleanup_old_snapshots(
         total_deleted, days, len(referenced_ids),
     )
     return total_deleted
+
+
+async def expire_stale_judgments(session: AsyncSession) -> int:
+    """将已过期但未结算的判断标记为 expired。
+
+    如果 judgment.expires_at 已过但没有对应 settlement，
+    创建一个 settlement 记录标记为过期（is_correct=None）。
+    返回过期处理的记录数。
+    """
+    from backend.models import Settlement
+    import uuid
+
+    now = datetime.utcnow()
+
+    # 找出已过期且未结算的判断
+    expired_stmt = (
+        select(Judgment)
+        .outerjoin(Settlement, Settlement.judgment_id == Judgment.id)
+        .where(
+            Judgment.expires_at.isnot(None),
+            Judgment.expires_at < now,
+            Settlement.id.is_(None),
+        )
+    )
+    result = await session.execute(expired_stmt)
+    expired_judgments = result.scalars().all()
+
+    if not expired_judgments:
+        return 0
+
+    count = 0
+    for j in expired_judgments:
+        settlement = Settlement(
+            id=uuid.uuid4(),
+            judgment_id=j.id,
+            actual_price=None,
+            actual_direction="expired",
+            is_correct=None,
+            brier_score=None,
+            settled_at=now,
+        )
+        session.add(settlement)
+        count += 1
+
+    await session.commit()
+    logger.info("过期清理: 标记 %d 条过期判断", count)
+    return count

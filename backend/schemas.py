@@ -86,6 +86,7 @@ class JudgmentOut(BaseModel):
     created_at: datetime
     is_settled: bool = False
     is_correct: Optional[bool] = None
+    is_expired: bool = False
 
     model_config = {"from_attributes": True}
 

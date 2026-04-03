@@ -45,6 +45,11 @@ def _judgment_to_out(j: Judgment, symbol: Optional[str] = None) -> JudgmentOut:
         created_at=j.created_at,
         is_settled=j.settlement is not None if hasattr(j, "settlement") and j.settlement is not None else False,
         is_correct=j.settlement.is_correct if hasattr(j, "settlement") and j.settlement is not None else None,
+        is_expired=(
+            hasattr(j, "settlement")
+            and j.settlement is not None
+            and j.settlement.actual_direction == "expired"
+        ),
     )
 
 

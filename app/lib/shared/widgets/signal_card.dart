@@ -21,6 +21,7 @@ class SignalCard extends StatelessWidget {
   final DateTime? createdAt;
   final bool? isSettled;
   final bool? isCorrect;
+  final bool isExpired;
   final double? qualityScore;
   final double? upProbability;
   final double? downProbability;
@@ -45,6 +46,7 @@ class SignalCard extends StatelessWidget {
     this.createdAt,
     this.isSettled,
     this.isCorrect,
+    this.isExpired = false,
     this.qualityScore,
     this.upProbability,
     this.downProbability,
@@ -353,7 +355,22 @@ class SignalCard extends StatelessWidget {
                     ),
                   ),
                   // Settlement status
-                  if (isSettled == true) ...[
+                  if (isExpired) ...[
+                    const Icon(
+                      Icons.schedule_rounded,
+                      size: 18,
+                      color: AppTheme.flatGray,
+                    ),
+                    const SizedBox(width: 4),
+                    const Text(
+                      '已过期',
+                      style: TextStyle(
+                        color: AppTheme.flatGray,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ] else if (isSettled == true) ...[
                     Icon(
                       isCorrect == true
                           ? Icons.check_circle_rounded

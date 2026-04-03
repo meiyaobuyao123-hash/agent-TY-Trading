@@ -101,6 +101,7 @@ class Judgment {
   final DateTime createdAt;
   final bool isSettled;
   final bool? isCorrect;
+  final bool isExpired;
 
   const Judgment({
     required this.id,
@@ -126,6 +127,7 @@ class Judgment {
     required this.createdAt,
     required this.isSettled,
     this.isCorrect,
+    this.isExpired = false,
   });
 
   factory Judgment.fromJson(Map<String, dynamic> json) {
@@ -174,6 +176,7 @@ class Judgment {
       createdAt: DateTime.parse(json['created_at'] as String),
       isSettled: json['is_settled'] as bool? ?? false,
       isCorrect: json['is_correct'] as bool?,
+      isExpired: json['is_expired'] as bool? ?? false,
     );
   }
 
